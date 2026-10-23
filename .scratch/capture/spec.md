@@ -110,7 +110,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
 ### The link script
 
 - This is a single command-line script that uses only the Python standard library and runs with plain `python3`. It needs no uv, because uv is for the Worker's dependencies. It does no network calls.
-- **Input:** the whole shared text.
+- **Input:** the whole shared text, on stdin or as arguments.
 - **Output:** one JSON object with these keys:
   - `platform`: `instagram`, `tiktok`, `youtube` or `other`.
   - `link`: the canonical link.
@@ -122,10 +122,11 @@ This spec also delivers the parts that every later job depends on: the plugin ma
   - `{"unsupported": "story"}` for Instagram Stories.
 - If the text holds more than one URL, the script uses the first one.
 - **Canonical forms:**
-  - **Instagram:** `/p/`, `/reel/`, `/reels/` and `/tv/` paths, with or without a username in front, become `https://www.instagram.com/p/<code>/`. The script drops the query string, which removes `igsh` and `img_index`. `/share/` links come back with `resolved: false`.
-  - **TikTok:** `/@user/video/<id>` and `/@user/photo/<id>` keep their path. The script drops the query string. `vm.tiktok.com` and `vt.tiktok.com` short links come back unchanged, with `resolved: false`.
+  - **Instagram:** `/p/`, `/reel/`, `/reels/` and `/tv/` paths, with or without a username in front, become `https://www.instagram.com/p/<code>/`. The script drops the query string, which removes `igsh` and `img_index`. `/share/` links are cleaned like other links and come back with `resolved: false`. `/reels/audio/` is a sound's page, not a post.
+  - **TikTok:** `/@user/video/<id>` and `/@user/photo/<id>` keep their path. The script drops the query string. `vm.tiktok.com`, `vt.tiktok.com` and `/t/` short links are cleaned like other links and come back with `resolved: false`.
   - **YouTube:** `watch?v=`, `youtu.be/`, `/shorts/`, `/live/` and the `m.` and `music.` hosts all become `https://www.youtube.com/watch?v=<id>`. The script drops `si`, `t`, `feature` and every other parameter.
   - **Other:** the script lowercases the host, drops the fragment, and drops `utm_*`, `fbclid`, `gclid`, `igsh` and `si`. It keeps every other parameter.
+  - **Platform links that are no post** (a profile, a channel, a playlist): the platform is kept, the link is cleaned like other links, and `id` is null.
 - **Preview URLs, in order:**
   - Instagram: the embed page `https://www.instagram.com/p/<code>/embed/captioned/`, then the shared link.
   - TikTok: the shared link. TikTok's oEmbed no longer returns a caption (checked 2026-10-23).
@@ -141,8 +142,8 @@ This spec also delivers the parts that every later job depends on: the plugin ma
 4. **Run the link script** on the message text. If the script cannot run, the agent applies the same rules, which the Capture reference file restates in short prose. This is the ADR 0002 fallback.
    - On `no link`, the agent drops Capture and answers normally.
    - On `unsupported: story`, the agent says that Stories are not supported in v1 and files nothing.
-5. **Check for a duplicate.** The agent queries the Entries for the same Link. If one exists, it adds a dated "captured again" line to the Entry's page body, replies that the post is already in the Library (with its date and Category), and stops.
-6. **Read a preview.** The agent tries each preview URL in order with its web fetch tool and stops at the first one that yields an author and a caption or a title. A fetch error or an empty page moves it on to the next URL.
+5. **Read a preview.** The agent tries each preview URL in order with its web fetch tool and stops at the first one that yields an author and a caption or a title. A fetch error or an empty page moves it on to the next URL.
+6. **Check for a duplicate.** The agent queries the Entries for the same Link. If one exists, it adds a dated "captured again" line to the Entry's page body, replies that the post is already in the Library (with its date and Category), and stops. This check comes after the preview, so an unresolved short link can first become canonical.
 7. **Write the Entry.** The agent writes Title, Summary, Next action and up to 3 Tags in the Settings language, reusing existing Tags where they fit. It picks the Category from the Settings and uses the fallback Category when none fits. It fills a Category's own fields only when the preview states the value.
    - **With no preview:** the Title is "<Platform> post by <author>", or the link when the author is unknown. Summary and Next action stay empty. The Category is the fallback. The Note says the Worker will fill it in.
 8. **Create the Entry** with Status Inbox and today's date as Captured.
@@ -170,7 +171,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
   - **Language:** one language name.
   - **Fields:** a two-column table that maps each canonical field to the Library's name for it.
   - **Statuses:** a two-column table that maps each canonical Status to the Library's label.
-  - **Categories:** a table with three columns: name, what goes in it, and its own fields. Exactly one row is marked as the fallback.
+  - **Categories:** a table with four columns: name, what goes in it, its own fields, and Fallback, which is marked on exactly one row.
   - **Schedule:** the Worker's weekday. Capture does not read it.
 - **The memory line** follows ADR 0002: "When I share a social link without text, file it in my graveyard-killer Library at <link>, following the Settings there."
 - Creating the Library is Setup's job and is out of scope here. For this slice, the agent creates one test Library on the Mac by hand from the contract. It is not a skill feature.
@@ -179,7 +180,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
 
 - **A good test checks external behaviour only.** For the script, that means the JSON that comes out for a given shared text. For the skill, it means the Entry that appears in the Library and the reply the user sees. Tests never check how the agent got there.
 - **Seam 1, the Capture behaviour (main seam).** It has two kinds of test:
-  - **Skill evals**, in skill-creator's eval format. They run on the Mac in Claude Code with the Notion connector, against a dedicated test Library that the eval run resets. The cases are:
+  - **Skill evals**, in skill-creator's eval format. They run on the Mac in Claude Code with the Notion connector, against a dedicated test Library that is emptied before each run. The memory line lives in the eval folder's memory, not in the prompt. The two duplicate cases run right after the case they repeat. The cases are:
     - an Instagram reel with Android share boilerplate and `igsh`
     - an Instagram carousel with `img_index`
     - a TikTok full link

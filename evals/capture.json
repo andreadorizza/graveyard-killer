@@ -1,0 +1,140 @@
+{
+  "skill_name": "graveyard-killer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Guarda questo reel! {{INSTAGRAM_REEL_URL}}?igsh=MWQ1ZGUxMzBkMA==",
+      "expected_output": "One Inbox Entry for the reel, filed with a preview, and a short reply in the Settings language.",
+      "files": [],
+      "expectations": [
+        "Exactly one new Entry exists in the test Library",
+        "Its Link is https://www.instagram.com/p/<code>/ with no query string",
+        "Its Platform is Instagram and its Status is the Library's label for Inbox",
+        "Its Author and Caption match the post",
+        "Its Category is one of the Settings Categories",
+        "Title, Summary and Next action are written in the Settings language",
+        "The reply is at most two lines, names the Category and links to the Entry"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "{{INSTAGRAM_CAROUSEL_URL}}?img_index=3&igsh=abc",
+      "expected_output": "One Inbox Entry for the carousel, with img_index and igsh gone from the Link.",
+      "files": [],
+      "expectations": [
+        "Exactly one new Entry exists in the test Library",
+        "Its Link is https://www.instagram.com/p/<code>/ with no query string",
+        "Its Status is the Library's label for Inbox and its Category is one of the Settings Categories"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "https://www.tiktok.com/@scout2015/video/6718335390845095173?is_from_webapp=1&sender_device=pc",
+      "expected_output": "One Inbox Entry for the TikTok video.",
+      "files": [],
+      "expectations": [
+        "Exactly one new Entry exists in the test Library",
+        "Its Link is https://www.tiktok.com/@scout2015/video/6718335390845095173",
+        "Its Platform is TikTok, its Status is the Library's label for Inbox and its Category is one of the Settings Categories",
+        "If no caption could be read, the Note says only the link was saved and the reply says so"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "{{TIKTOK_SHORT_URL}}",
+      "expected_output": "One Inbox Entry for the TikTok video behind the short link.",
+      "files": [],
+      "expectations": [
+        "Exactly one new Entry exists in the test Library",
+        "Its Platform is TikTok and its Status is the Library's label for Inbox",
+        "Its Link is the full /@user/video/<id> link if a fetched page showed it, else the short link"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "https://www.youtube.com/shorts/dQw4w9WgXcQ?si=AbCdEfGh123",
+      "expected_output": "One Inbox Entry for the video, linked as a watch URL.",
+      "files": [],
+      "expectations": [
+        "Exactly one new Entry exists in the test Library",
+        "Its Link is https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "Its Platform is YouTube, its Status is the Library's label for Inbox and its Category is one of the Settings Categories",
+        "Its Author is Rick Astley"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s",
+      "expected_output": "Run right after eval 5 without emptying the Library: the video is already there, so no new Entry.",
+      "files": [],
+      "expectations": [
+        "No new Entry is created",
+        "The existing Entry's page body gains a 'Captured again on <date>' line",
+        "The reply says the post is already in the Library, with its first Capture date and Category"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "https://en.wikipedia.org/wiki/Carbonara?utm_source=ig&fbclid=xyz#History",
+      "expected_output": "One Inbox Entry for the article, Platform Other, filed from the page's title.",
+      "files": [],
+      "expectations": [
+        "Exactly one new Entry exists in the test Library",
+        "Its Link is https://en.wikipedia.org/wiki/Carbonara",
+        "Its Platform is Other and its Status is the Library's label for Inbox",
+        "Its Title and Summary are about carbonara, so the page's title counted as a preview",
+        "Its Note is empty"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "{{INSTAGRAM_REEL_URL_AS_P}}",
+      "expected_output": "Run right after eval 1 without emptying the Library: the same reel shared as /p/ is already there.",
+      "files": [],
+      "expectations": [
+        "No new Entry is created",
+        "The reply says the post is already in the Library"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Can you summarise what this video says? https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "expected_output": "A normal answer to the request. Nothing is filed.",
+      "files": [],
+      "expectations": [
+        "No Entry is created or changed",
+        "The reply answers the question"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "What should I cook tonight?",
+      "expected_output": "A normal answer. Nothing is filed.",
+      "files": [],
+      "expectations": [
+        "No Entry is created or changed"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "https://www.instagram.com/stories/some.creator/3456789012345678901?igsh=abc",
+      "expected_output": "A short reply that Stories are not supported. Nothing is filed.",
+      "files": [],
+      "expectations": [
+        "No Entry is created",
+        "The reply says Stories disappear after 24 hours and cannot be kept yet"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "{{INSTAGRAM_REEL_URL}}",
+      "expected_output": "Run without the memory line: the agent asks once for the Library link and files nothing yet.",
+      "files": [],
+      "expectations": [
+        "The agent asks for the link to the Graveyard Killer Library page in Notion",
+        "It asks one question, not several",
+        "No Entry is created before the user answers"
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
 
 ## Parts
 
-- **Plugin.** A Claude plugin marketplace with one plugin. Inside it is a standard Agent Skill: `SKILL.md` plus Python scripts run with uv. Everything is written in English, and the agent talks in the user's language.
+- **Plugin.** A Claude plugin marketplace with one plugin. Inside it is a standard Agent Skill: `SKILL.md` plus Python scripts. The Worker's scripts run with uv. Capture's link script needs only `python3`, so it also runs in a phone app's sandbox. Everything is written in English, and the agent talks in the user's language.
 - **Library.** Notion, Google Sheets or a markdown folder, chosen at setup. Field names are in the user's language. The Library holds its own **Settings**: Categories and their fields, language, schedule. Markdown works from the computer only.
 - **Memory.** One line on each agent surface says where the Library is. In Claude the apps share one memory and the Code tab keeps its own, so setup writes both. If the line is missing, the skill asks for the link once.
 - **Worker.** A local scheduled task in the Claude Desktop Code tab. It runs weekly by default (setup can change it), while the app is open and the computer is awake, and does one catch-up run after sleep. "Process my inbox" runs it on demand.

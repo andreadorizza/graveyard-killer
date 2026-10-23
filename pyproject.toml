@@ -1,0 +1,15 @@
+[project]
+name = "graveyard-killer"
+version = "0.1.0"
+description = "Development tooling for the graveyard-killer skill's scripts."
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = ["pytest>=8", "mypy>=1.10"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+files = ["plugin/skills/graveyard-killer/scripts", "tests"]

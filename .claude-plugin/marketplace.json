@@ -1,0 +1,23 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "graveyard-killer",
+  "metadata": {
+    "description": "Capture posts from your phone into your own Library."
+  },
+  "owner": {
+    "name": "Graveyard Killer contributors"
+  },
+  "plugins": [
+    {
+      "name": "graveyard-killer",
+      "description": "Send a post from Instagram, TikTok or YouTube to your agent. It files what the post says in your own Notion Library. No server, no API keys.",
+      "author": {
+        "name": "Graveyard Killer contributors"
+      },
+      "source": "./plugin",
+      "category": "productivity",
+      "homepage": "https://github.com/andreadorizza/graveyard-killer",
+      "tags": ["notion", "instagram", "tiktok", "youtube", "saved-posts"]
+    }
+  ]
+}
