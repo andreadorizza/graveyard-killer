@@ -6,8 +6,8 @@ Every Graveyard Killer job reads and writes the Library the same way. This file 
 
 The **Library** is one Notion page. It holds two things:
 
-- the **Entries** database, with one row per Entry;
-- a child page, the **Settings**.
+- the **Entries** database, with one row per Entry. It is the only database on the Library page;
+- a child page titled `Settings`.
 
 The memory line points to the Library page.
 
