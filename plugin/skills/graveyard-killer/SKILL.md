@@ -1,6 +1,6 @@
 ---
 name: graveyard-killer
-description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request: a bare link, a link inside an app's share text, or a link with a short "save this". Also use when the user names Graveyard Killer.
+description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use when the user names Graveyard Killer.
 ---
 
 # Graveyard Killer
