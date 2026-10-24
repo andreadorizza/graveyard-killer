@@ -155,6 +155,17 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - `needs_login`: Instagram's "rate-limit reached or login required" and similar challenges.
   - `error`: any other failure, including a missing tool (named in the reason).
 
+### Prior art to borrow: claude-video
+
+[claude-video](https://github.com/bradautomates/claude-video) (the `/watch` skill, v0.3.2, MIT) already solves the video half of the post script. The post script borrows these decisions from it, credits the project in a comment where code is adapted, and keeps the MIT notice with any copied code:
+
+- **Caption choice:** at most one track. Prefer creator captions in the video's own language, then the original-language automatic captions. Record where the captions came from.
+- **Keyframes:** scene-change frames, with uniform sampling as the fallback on nearly static clips, and a small-thumbnail pass that drops near-duplicate frames before the cap applies.
+- **Downloads:** each run gets a fresh work folder. A partial download or a leftover merge file never counts as media.
+- **Clean-up:** delete only the work folder that this run created, never its parent.
+- **On a 403 or login challenge from yt-dlp:** update yt-dlp once and retry once before reporting the status. Rotating clients or cookies is ruled out.
+- **Non-English speech:** pass a spoken-language hint to Whisper when the Settings language or the caption suggests one. Report language detection as unverified otherwise.
+
 ### The run (the agent's steps)
 
 1. **Prepare.** Find the Library, read the Settings and run `check`. If tools are missing, ask once to install them, install them, and check again.
@@ -229,6 +240,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 - **Prior art:**
   - The link script's tests already call a script as the agent does, with a subprocess, text in and JSON out.
   - `evals/capture.json` sets the eval format and the test Library practice.
+  - claude-video's tests build their media with FFmpeg in the test itself, and they run yt-dlp offline. That is the same approach as the fake tools here.
 
 ## Out of Scope
 
@@ -255,6 +267,12 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - yt-dlp or gallery-dl reads TikTok photo posts.
   - Whisper turbo handles Italian speech well enough for Summaries.
   - A 14-minute video transcribes in reasonable time on Apple Silicon.
+- **Why claude-video is not a dependency** (checked 2026-10-24):
+  - It is a second plugin for every user to install.
+  - Its first-run setup recommends a Gemini API key, which conflicts with ADR 0001.
+  - It rejects carousels, which yt-dlp reports as `multi_video`, and it has no photo support.
+  - It prints a markdown report for an agent. It has no JSON output, and it does not separate "unavailable" from "needs a login".
+- **No cloud Worker:** ADR 0001 rejects running the Worker on a cloud instance by default.
 - **Account safety:** Instagram has flagged sessions after a few dozen downloads (ADR 0001). This slice uses no session at all. A challenge still stops Instagram for the run, to protect the IP.
 - **Unattended runs:** the Code tab asks for approval of shell and Notion tool calls. This is fine by hand. The scheduled run will need "always allow" (Setup step 6).
 - The four new checks above are on design.md's "To verify while building" list.
