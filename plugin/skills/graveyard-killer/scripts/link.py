@@ -55,17 +55,18 @@ def on_site(host: str, site: str) -> bool:
 
 
 def instagram(shared: str) -> dict[str, Any]:
+    # No preview URLs: Instagram refuses agent fetches, and its embed page no
+    # longer carries the caption. Capture files the link; the Worker reads the post.
     path = urlsplit(shared).path
     if path.startswith("/stories/"):
         return {"unsupported": "story"}
     if path.startswith("/share/"):
-        return result("instagram", clean(shared), None, [shared], resolved=False)
+        return result("instagram", clean(shared), None, [], resolved=False)
     post = INSTAGRAM_POST.search(path)
     if not post:
-        return result("instagram", clean(shared), None, [shared])
+        return result("instagram", clean(shared), None, [])
     code = post.group(1)
-    link = f"https://www.instagram.com/p/{code}/"
-    return result("instagram", link, code, [f"{link}embed/captioned/", shared])
+    return result("instagram", f"https://www.instagram.com/p/{code}/", code, [])
 
 
 def tiktok(shared: str) -> dict[str, Any]:

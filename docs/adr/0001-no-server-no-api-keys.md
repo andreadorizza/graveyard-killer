@@ -5,12 +5,12 @@ Graveyard Killer is for people who will not manage API keys or a server. So it h
 ## Considered Options
 
 - **A hosted service that downloads for everyone.** It would need our own Instagram accounts and datacenter IPs, which Instagram blocks or rate-limits. It would also mean accounts, billing and running a server. Rejected.
-- **The phone's chat agent does everything.** Chat agents run code in a cloud sandbox. Gemini's has no internet, ChatGPT's blocks the open web, and none has the user's login. Uploading Instagram cookies to a sandbox would hand over the account. Rejected. The phone still captures, using the caption from the post's public embed page as a preview.
+- **The phone's chat agent does everything.** Chat agents run code in a cloud sandbox. Gemini's has no internet, ChatGPT's blocks the open web, and none has the user's login. Uploading Instagram cookies to a sandbox would hand over the account. Rejected. The phone still captures. For TikTok, YouTube and other links it reads a preview from public pages. For Instagram it files the link only (Pixel run, 2026-10-24).
 - **The Worker calls an LLM API itself.** Fully automatic, but it needs a key the target users cannot set up. Rejected.
 
 ## Consequences
 
-- An Entry captured on the phone stays a preview until the Worker's next weekly run. This makes Stories (gone in 24 hours) impossible in v1.
+- An Entry captured on the phone stays a preview until the Worker's next weekly run. An Instagram Entry holds only its link until then. This makes Stories (gone in 24 hours) impossible in v1.
 - Phone-only users never get transcripts.
 - The Worker runs only while the Claude Desktop app is open and the computer is awake. A missed run catches up once.
 - Downloading with the user's login puts their real Instagram account at risk. Instagram has flagged sessions for "suspected scraping" after a few dozen downloads, and no safe rate is known. So the Worker tries every Instagram post without the login first. It uses the login only as a fallback, for a few posts per run with long random pauses, and stops the run at the first challenge. It digs up only 10 Buried Entries per run by default. Setup states this risk to the user.

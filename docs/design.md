@@ -11,7 +11,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
 
 ## Flow
 
-1. **Capture, on the phone.** You share a link to the agent app. The agent reads the author and caption from the post's embed page (`/p/<code>/embed/captioned/`, no login needed). It files an Entry in the Inbox with a first Category, summary and Next action. The same link twice stays one Entry, and the second capture is noted.
+1. **Capture, on the phone.** You share a link to the agent app. For TikTok, YouTube and other links, the agent reads a preview from public pages, then files an Entry in the Inbox with a first Category, summary and Next action. For Instagram it files the link only, because Instagram refuses agent fetches and its embed page no longer carries the caption. The Worker fills in the rest. The same link twice stays one Entry, and the second capture is noted.
 2. **Worker run, weekly.**
    - Download: yt-dlp for video, gallery-dl for photos and carousels.
    - Extract: Whisper for speech (mlx-whisper on Apple Silicon, faster-whisper elsewhere), or YouTube's own captions when present. The agent reads on-screen text from keyframes.
@@ -76,12 +76,12 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 
 ## To verify while building
 
-- [ ] The plugin's skill loads in the Claude Android app, and Capture works from Instagram's share menu.
+- [x] The plugin's skill loads in the Claude Android app, and Capture works from Instagram's share menu. (Pixel, 2026-10-24: the Entry was created with Status Inbox.)
 - [ ] The synced plugin loads in the Desktop Code tab and inside its scheduled tasks.
-- [ ] Claude's fetch tool reads the caption from the embed page.
-- [ ] Claude's fetch tool on the phone accepts a preview URL that the agent built (the embed page, YouTube oEmbed). Its docs say it fetches only URLs already in the conversation.
+- [ ] ✗ Claude's fetch tool reads the caption from the embed page. (2026-10-24: refused on the Pixel. From a home connection, the embed page is now a page that JavaScript fills in, with no caption in its HTML, even for public posts.)
+- [ ] Claude's fetch tool on the phone accepts a preview URL that the agent built (the embed page, YouTube oEmbed). Its docs say it fetches only URLs already in the conversation. (2026-10-24: every Instagram preview URL was refused on the Pixel. YouTube is not tested yet.)
 - [ ] The fetch tool's text keeps the TikTok caption and the YouTube description from the post page. Their oEmbed endpoints do not return them.
-- [ ] A shared link with no text triggers the skill in the Android app, through the skill's description alone. Memory holds no Capture rule to fall back on.
+- [x] A shared link with no text triggers the skill in the Android app, through the skill's description alone. Memory holds no Capture rule to fall back on. (Pixel, 2026-10-24.)
 - [ ] TikTok short links and Instagram `/share/` links resolve to one canonical link, so the same post shared twice stays one Entry.
 - [ ] The Notion connector stores a 2,200-character caption in one field.
 - [ ] Claude's Sheets connector can append rows to an existing sheet.

@@ -128,7 +128,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
   - **Other:** the script lowercases the host, drops the fragment, and drops `utm_*`, `fbclid`, `gclid`, `igsh` and `si`. It keeps every other parameter.
   - **Platform links that are no post** (a profile, a channel, a playlist): the platform is kept, the link is cleaned like other links, and `id` is null.
 - **Preview URLs, in order:**
-  - Instagram: the embed page `https://www.instagram.com/p/<code>/embed/captioned/`, then the shared link.
+  - Instagram: none. Capture files the link only, and the Worker reads the post (Pixel run, 2026-10-24: the phone refused every Instagram fetch, and the embed page no longer has the caption in its HTML).
   - TikTok: the shared link. TikTok's oEmbed no longer returns a caption (checked 2026-10-23).
   - YouTube: the oEmbed URL (title and author), then the shared link.
   - Other: the shared link.
@@ -219,6 +219,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
 
 ## Further Notes
 
+- **Result of the Pixel run (2026-10-24):** the skill started on its own, the share delivered the link, and a link-only Entry was created with Status Inbox. Every Instagram preview fetch was refused, so Instagram Captures are now link-only. TikTok and YouTube previews are not tested on the phone yet.
 - **Biggest risk: building preview URLs.** Claude's web fetch tool documentation says the tool only fetches URLs that already appeared in the conversation: user messages, client-side tool results, and earlier search or fetch results. It does not fetch URLs found only in Claude's own output (checked 2026-10-23, docs.claude.com, web fetch tool, "URL validation"). The Instagram embed URL and the YouTube oEmbed URL are both built from the shared link. So the phone app may refuse them. It is unknown whether the script's output in the sandbox counts as a tool result. The preview order and the link-only Entry keep Capture useful either way. The Pixel run decides which sources work. If none works on the phone, two options exist: script-side fetching where the sandbox has network access, or leaving previews to the Worker.
 - **TikTok previews:** the oEmbed endpoint returns only a player iframe, with no title or author (checked 2026-10-23). The caption sits in JSON embedded in the post page. It is unknown whether the web fetch tool's text output keeps it.
 - **YouTube previews:** oEmbed returns the title and the author, with no description (checked 2026-10-23). The description sits in JSON embedded in the watch page.

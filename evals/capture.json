@@ -4,16 +4,14 @@
     {
       "id": 1,
       "prompt": "Guarda questo reel! {{INSTAGRAM_REEL_URL}}?igsh=MWQ1ZGUxMzBkMA==",
-      "expected_output": "One Inbox Entry for the reel, filed with a preview, and a short reply in the Settings language.",
+      "expected_output": "One link-only Inbox Entry for the reel, and a short reply in the Settings language.",
       "files": [],
       "expectations": [
         "Exactly one new Entry exists in the test Library",
         "Its Link is https://www.instagram.com/p/<code>/ with no query string",
         "Its Platform is Instagram and its Status is the Library's label for Inbox",
-        "Its Author and Caption match the post",
-        "Its Category is one of the Settings Categories",
-        "Title, Summary and Next action are written in the Settings language",
-        "The reply is at most two lines, names the Category and links to the Entry"
+        "Its Category is the fallback Category and its Note, in the Settings language, says only the link was saved",
+        "The reply is at most two lines, says only the link was saved and links to the Entry"
       ]
     },
     {

@@ -25,7 +25,9 @@ def run_link_script(shared_text: str) -> dict[str, Any]:
     return parsed
 
 
-def test_instagram_reel_becomes_a_canonical_post_link() -> None:
+def test_instagram_reel_becomes_a_canonical_post_link_with_no_preview() -> None:
+    # Instagram refuses agent fetches and its embed page no longer carries the
+    # caption, so Capture files the link only and the Worker reads the post.
     shared = "https://www.instagram.com/reel/DAbc123xyz/?igsh=MWQ1ZGUxMzBkMA=="
 
     assert run_link_script(shared) == {
@@ -33,10 +35,7 @@ def test_instagram_reel_becomes_a_canonical_post_link() -> None:
         "link": "https://www.instagram.com/p/DAbc123xyz/",
         "id": "DAbc123xyz",
         "resolved": True,
-        "preview_urls": [
-            "https://www.instagram.com/p/DAbc123xyz/embed/captioned/",
-            shared,
-        ],
+        "preview_urls": [],
     }
 
 
@@ -67,7 +66,7 @@ def test_instagram_share_link_needs_a_redirect() -> None:
         "link": "https://www.instagram.com/share/reel/BAGjK2x1Yz/",
         "id": None,
         "resolved": False,
-        "preview_urls": [shared],
+        "preview_urls": [],
     }
 
 
@@ -171,16 +170,6 @@ def test_other_link_loses_only_tracking_parameters_and_fragment() -> None:
     ("shared", "platform", "canonical"),
     [
         (
-            "https://www.instagram.com/some.creator/?igsh=abc",
-            "instagram",
-            "https://www.instagram.com/some.creator/",
-        ),
-        (
-            "https://www.instagram.com/reels/audio/1234567890/",
-            "instagram",
-            "https://www.instagram.com/reels/audio/1234567890/",
-        ),
-        (
             "https://www.youtube.com/@SomeChannel?si=abc",
             "youtube",
             "https://www.youtube.com/@SomeChannel",
@@ -209,11 +198,38 @@ def test_platform_link_that_is_no_post_is_a_plain_link(
     }
 
 
+@pytest.mark.parametrize(
+    ("shared", "canonical"),
+    [
+        ("https://www.instagram.com/some.creator/?igsh=abc", "https://www.instagram.com/some.creator/"),
+        (
+            "https://www.instagram.com/reels/audio/1234567890/",
+            "https://www.instagram.com/reels/audio/1234567890/",
+        ),
+    ],
+)
+def test_instagram_link_that_is_no_post_is_a_plain_link_with_no_preview(
+    shared: str, canonical: str
+) -> None:
+    assert run_link_script(shared) == {
+        "platform": "instagram",
+        "link": canonical,
+        "id": None,
+        "resolved": True,
+        "preview_urls": [],
+    }
+
+
 def test_share_text_and_trailing_punctuation_are_ignored() -> None:
     result = run_link_script("Guarda questo reel (https://www.instagram.com/reel/DAbc123xyz/?igsh=abc).")
 
     assert result["link"] == "https://www.instagram.com/p/DAbc123xyz/"
-    assert result["preview_urls"][1] == "https://www.instagram.com/reel/DAbc123xyz/?igsh=abc"
+
+
+def test_preview_uses_the_shared_url_without_trailing_punctuation() -> None:
+    result = run_link_script("Leggi qui (https://example.com/ricetta?id=7).")
+
+    assert result["preview_urls"] == ["https://example.com/ricetta?id=7"]
 
 
 def test_trailing_ellipsis_is_not_part_of_the_link() -> None:
