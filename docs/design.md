@@ -82,8 +82,8 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 - [ ] Claude's fetch tool on the phone accepts a preview URL that the agent built (the embed page, YouTube oEmbed). Its docs say it fetches only URLs already in the conversation. (2026-10-24 on the Pixel: every Instagram preview URL was refused. A YouTube Short got a full preview, with author, title, Summary and Next action. Which of its two preview URLs served it is not recorded.)
 - [ ] ✗ The fetch tool's text keeps the TikTok caption and the YouTube description from the post page. Their oEmbed endpoints do not return them. (2026-10-24 on the Pixel: a shared TikTok gave no preview at all. YouTube gave the title but not the description.)
 - [x] A shared link with no text triggers the skill in the Android app, through the skill's description alone. Memory holds no Capture rule to fall back on. (Pixel, 2026-10-24.)
-- [ ] TikTok short links and Instagram `/share/` links resolve to one canonical link, so the same post shared twice stays one Entry. (2026-10-24: TikTok's Android share gives a `vm.tiktok.com` short link. Capture could not resolve it on the Pixel, so the Worker must.)
+- [ ] TikTok short links and Instagram `/share/` links resolve to one canonical link, so the same post shared twice stays one Entry. (2026-10-24: TikTok's Android share gives a `vm.tiktok.com` short link. Capture could not resolve it on the Pixel, so the Worker must. yt-dlp resolves it: the `webpage_url` it returns, run through the link script, gives the canonical link.)
 - [ ] The Notion connector stores a 2,200-character caption in one field.
 - [ ] Claude's Sheets connector can append rows to an existing sheet.
 - [ ] The Instagram export parser handles a real export, including collections with no save date.
-- [ ] Anonymous yt-dlp works for public reels from a home connection.
+- [x] Anonymous yt-dlp works for public reels from a home connection. (2026-10-24, yt-dlp 2026.10.21, metadata only, no cookies: an Instagram reel gave its author, its full caption and 8 formats. A TikTok short link gave its author, its caption and 10 formats.)
