@@ -116,17 +116,17 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - yt-dlp and gallery-dl, as uv tools.
   - mlx-whisper on Apple Silicon, or whisper-ctranslate2 (built on faster-whisper) elsewhere, as uv tools.
   - ffmpeg from the system package manager.
-- **Checking them:** the post script has a `check` command. It lists what is missing, with the install command for this platform.
+- **Checking them:** the post script has a `check` command. It lists what is missing, uv included, with the install command for this platform. It also says whether the speech model is downloaded yet, so the agent can warn before the first transcription.
 - **Asking first:** the agent asks once before installing anything. It names each tool and says the speech model downloads on first use, about 1.6 GB for the turbo model.
 - **The speech model** is Whisper turbo (large-v3-turbo) on both builds.
 
 ### The post script
 
-- It is one command-line script in the skill, run with uv.
+- It is one command-line script in the skill. It uses only the Python standard library and runs with plain `python3`, like the link script. The tools it calls are uv tools.
 - It calls each tool as an outside program found on PATH, which is the seam the tests use. It imports the link script to make links canonical.
 - **Commands:**
   - `check`: reports missing tools as JSON.
-  - `read <link> --work <folder>`: reads one post into a fresh work folder and prints one JSON object.
+  - `read [<link>] [--language <code>]`: reads one post into a fresh temporary work folder and prints one JSON object. The agent passes the link on stdin through a quoted heredoc, so no shell ever expands it. Anything but an `http(s)://` link is refused before any tool runs, and every tool gets `--` before the link, so a "link" can never act as an option. `--language` passes a spoken-language hint to Whisper.
   - `clean <folder>`: deletes a work folder. It refuses any folder that lacks the marker file that `read` creates.
 - **`read` output.** All paths point inside the work folder. The JSON object has:
   - `status`: `ok`, `unavailable`, `needs_login` or `error`
@@ -135,7 +135,8 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - `id`, `author`, `title`, `caption`
   - `kind`: `video` or `photos`
   - `duration`
-  - `transcript`, plus `transcript_source` (`captions`, `whisper` or `none`) and `transcript_language`
+  - `transcript`, plus `transcript_source` (`captions`, `auto_captions`, `whisper` or `none`) and `transcript_language`
+  - `work`: the work folder, for `clean`
   - `keyframes`: image paths
   - `thumbnail`: a JPEG path, kept under 5 MiB for Notion's Free plan
 - **Reading a post:**
@@ -143,7 +144,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - If yt-dlp reports a post with no video (an Instagram photo post or carousel, or a TikTok photo post), the script falls back to gallery-dl, also anonymously.
   - The output keeps the yt-dlp metadata and gallery-dl's images.
 - **Transcript:**
-  - The creator's YouTube captions are used when they exist, in the video's own language.
+  - The creator's captions are used when they exist, in the video's own language. Otherwise the original-language automatic captions are used (see the borrowed caption choice below).
   - Otherwise Whisper runs on the audio, if there is audio.
   - Photos get no transcript.
 - **Keyframes:**
@@ -161,17 +162,18 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 
 - **Caption choice:** at most one track. Prefer creator captions in the video's own language, then the original-language automatic captions. Record where the captions came from.
 - **Keyframes:** scene-change frames, with uniform sampling as the fallback on nearly static clips, and a small-thumbnail pass that drops near-duplicate frames before the cap applies.
-- **Downloads:** each run gets a fresh work folder. A partial download or a leftover merge file never counts as media.
+- **Downloads:** each run gets a fresh work folder. A partial download or a leftover merge file never counts as media. Both tools ignore the user's own config files, so no cookies or login stored there are used.
 - **Clean-up:** delete only the work folder that this run created, never its parent.
-- **On a 403 or login challenge from yt-dlp:** update yt-dlp once and retry once before reporting the status. Rotating clients or cookies is ruled out.
-- **Non-English speech:** pass a spoken-language hint to Whisper when the Settings language or the caption suggests one. Report language detection as unverified otherwise.
+- **On an HTTP 403 from yt-dlp:** update yt-dlp once (`uv tool upgrade yt-dlp`) and retry once before reporting the status. A login challenge is never retried, because ADR 0001 says to stop reading Instagram at the first challenge. Rotating clients or cookies is ruled out.
+- **Non-English speech:** pass a spoken-language hint to Whisper when the Entry's Caption is clearly in one language. The Settings language is the user's, not the video's, so it is never the hint. Otherwise Whisper detects the language itself. (claude-video's "unverified" label was for a WhisperX bug that turbo does not have.)
 
 ### The run (the agent's steps)
 
 1. **Prepare.** Find the Library, read the Settings and run `check`. If tools are missing, ask once to install them, install them, and check again.
 2. **List the Inbox.** Query the Entries with the Inbox Status label, oldest Captured first. If there are none, say so and stop.
-3. **For each Entry**, run `read` on its Link, then act on the status:
-   - `needs_login`: leave the Entry in the Inbox and set the Note to say that Instagram asked for a login and the next run will retry. Skip every remaining Instagram Entry in this run, with the same Note.
+3. **For each Entry** with Platform Other (an article or any other page), there is no media to read. If its Summary is empty, the agent fills it from the page with its web fetch tool. Then it sets Status Processed and clears the Note.
+   **For every other Entry**, run `read` on its Link, then act on the status:
+   - `needs_login`: leave the Entry in the Inbox and set the Note to say that Instagram asked for a login and the next run will retry. Skip every remaining Instagram Entry in this run, with the same Note. TikTok and YouTube Entries carry on: ADR 0001 stops reading Instagram, not the whole run.
    - `unavailable`: set Status Unavailable and set the Note to the reason. Change nothing else.
    - `error`: leave the Entry in the Inbox, set the Note to the reason, and go on.
    - `ok` with a `link` different from the Entry's Link: query for an Entry with the new link.
@@ -180,7 +182,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
    - `ok`: finish the Entry, as described in [Finishing an Entry](#finishing-an-entry).
 4. **Clean up** the work folder with `clean` after each Entry, whatever its result.
 5. **Pause** for a random 3 to 8 seconds before each Instagram Entry after the first.
-6. **Report** in the Settings language:
+6. **Tell the user how the run went** in the Settings language:
    - counts of Processed, Unavailable, merged, and still in the Inbox;
    - each Entry still in the Inbox, with its reason.
 
@@ -195,7 +197,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - **Category fields:** filled only when the post states the value and the field is empty.
   - **Author and Caption:** set from the post. A caption too long for its field overflows into the page body, as in the Library contract.
 - **Page body:** the agent adds a Transcript section and an On-screen text section, with headings in the Settings language. It leaves out any section that would be empty.
-- **Cover:** the agent uploads the thumbnail through the Notion connector's file upload and sets it as the page cover.
+- **Cover:** the agent uploads the thumbnail through the Notion connector's file upload and sets it as the page cover. A connector with no file upload means no cover, and that is not a failed write.
 - **Last step:** the agent sets Status Processed and clears the Note. Status Processed is written only after every write above has succeeded.
 
 ### Library contract changes
@@ -221,13 +223,15 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
     - A non-existent YouTube video ends Unavailable, with a Note.
     - "Process my inbox" with no Inbox Entries reports that there is nothing to do.
     - An Entry with a Category set by hand keeps it.
+    - An article Entry (Platform Other) with an empty Summary ends Processed, with no post read.
     - No work folder is left on disk after the run.
 - **Seam 2, the post script.**
   - It is built test first with pytest, and the tests call the script as the agent does.
-  - Fake `yt-dlp`, `gallery-dl`, `ffmpeg`, `ffprobe` and Whisper commands are placed first on PATH. They print stored JSON and write small media files. No test needs the network.
+  - Fake `yt-dlp`, `gallery-dl`, Whisper and `uv` commands are placed first on PATH. They print stored JSON and copy small media files. Real `ffmpeg` and `ffprobe` run on short clips and images that the tests build, so the keyframe and thumbnail checks test real behaviour. No test needs the network. Without ffmpeg on the computer, the media tests skip.
   - The cases:
     - a video post with speech gives a Whisper transcript;
     - a YouTube video with creator captions gives `transcript_source: captions`, and Whisper is never called;
+    - with no creator captions, the original-language automatic captions give `auto_captions`;
     - a short link's resolved `webpage_url` gives a canonical `link`;
     - a carousel falls back to gallery-dl, gives image keyframes and has no transcript;
     - removed or private posts give `unavailable`;
@@ -235,7 +239,13 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
     - a missing tool gives `error`, with the tool's name;
     - `check` lists the missing tools;
     - `clean` deletes a work folder and refuses a folder without the marker;
-    - the thumbnail stays under 5 MiB.
+    - the thumbnail stays under 5 MiB;
+    - the link arrives on stdin, and anything but a web link is refused before any tool runs;
+    - downloads ignore the tools' config files and cookies, and ask for at most 720p;
+    - odd tool output gives `error`, never a traceback;
+    - frames fit in a 1024 px square, tall slides included, and a clip with many scenes gives at most 8 distinct frames;
+    - a photo post behind a short link gets its canonical link;
+    - `check` asks for uv and says whether the speech model is downloaded.
   - **The live test** is opt-in, behind a pytest marker. It runs the real tool chain on the public YouTube test video, with no Instagram.
 - **Prior art:**
   - The link script's tests already call a script as the agent does, with a subprocess, text in and JSON out.

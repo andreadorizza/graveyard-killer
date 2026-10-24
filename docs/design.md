@@ -4,7 +4,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
 
 ## Parts
 
-- **Plugin.** A Claude plugin marketplace with one plugin. Inside it is a standard Agent Skill: `SKILL.md` plus Python scripts. The Worker's scripts run with uv. Capture's link script needs only `python3`, so it also runs in a phone app's sandbox. Everything is written in English, and the agent talks in the user's language.
+- **Plugin.** A Claude plugin marketplace with one plugin. Inside it is a standard Agent Skill: `SKILL.md` plus Python scripts. Both scripts, Capture's link script and the Worker's post script, use only the Python standard library and run with `python3`, so the link script also runs in a phone app's sandbox. The tools the post script calls (yt-dlp, gallery-dl, Whisper) are installed with uv. Everything is written in English, and the agent talks in the user's language.
 - **Library.** Notion, Google Sheets or a markdown folder, chosen at setup. Field names are in the user's language. The Library holds its own **Settings**: Categories and their fields, language, schedule. Markdown works from the computer only.
 - **Memory.** One line on each agent surface says where the Library is. In Claude the apps share one memory and the Code tab keeps its own, so setup writes both. If the line is missing, the skill asks for the link once.
 - **Worker.** A local scheduled task in the Claude Desktop Code tab. It runs weekly by default (setup can change it), while the app is open and the computer is awake, and does one catch-up run after sleep. "Process my inbox" runs it on demand.
@@ -27,7 +27,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
 Instagram has locked sessions for "suspected scraping" after a few dozen downloads, and no safe rate is known. So:
 - Every Instagram post is tried without login first.
 - The login is a fallback: a few posts per run, with long random pauses.
-- The run stops at the first challenge, and the rest waits for next week.
+- At the first Instagram challenge, the run stops reading Instagram, and those posts wait for next week. TikTok and YouTube posts carry on.
 
 Setup states the risk. TikTok and YouTube use the normal path. A login failure leaves the Entry in the Inbox with a note ("log in to Instagram in Chrome"). Windows reads cookies from Firefox or an exported `cookies.txt`, since Chrome's are encrypted there.
 

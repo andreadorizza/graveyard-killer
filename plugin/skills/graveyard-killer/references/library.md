@@ -25,16 +25,36 @@ The Library uses the user's own names for fields and Statuses, in their language
 | Author | text | The account that posted it |
 | Caption | text | The post's own text, in its original language |
 | Category | select | One Category from the Settings |
-| Summary | text | One or two sentences in the Settings language |
+| Summary | text | In the Settings language: one or two sentences at Capture, two or three after the Worker |
 | Next action | text | The one thing the user could do with it |
 | Tags | multi-select | Free labels |
 | Status | select | One Status (see below) |
 | Captured | date | The date of the first Capture |
-| Note | text | A message to the user about a problem with this Entry |
+| Note | text | Something about this Entry that needs attention. It is empty when nothing does |
 
 Each Category can add its own fields. They are named in the Settings and exist as extra properties in the Entries database.
 
-The Entry's page body holds what does not fit a field: one dated line for each extra Capture of the same post, and the full caption when it is too long for the Caption field.
+The Entry's page body holds what does not fit a field:
+
+- one dated line for each extra Capture of the same post;
+- the full caption, when it is too long for the Caption field;
+- a Transcript section and an On-screen text section, written by the Worker, with headings in the Settings language.
+
+## After Capture
+
+The Worker knows more about a post than Capture did, and the user may have edited the Entry in between. So the Worker changes an Entry's fields by these rules:
+
+| Field | The Worker |
+| --- | --- |
+| Title | Replaces it only if it is empty or still Capture's "<Platform> post…" title |
+| Category | Replaces it only if it is the fallback Category |
+| Summary, Next action | Rewrites them from the full post |
+| Tags | Adds Tags and never removes one |
+| Category fields | Fills only empty ones |
+| Author, Caption | Sets them from the post |
+| Link | Replaces a short link with the post's canonical link |
+
+When a resolved link shows that two Entries hold the same post, the older Entry stays. The newer one goes to the Notion trash, and the older one gains a "Captured again on <date>" line.
 
 ## Statuses
 

@@ -1,6 +1,6 @@
 ---
 name: graveyard-killer
-description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use when the user names Graveyard Killer.
+description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use when the user names Graveyard Killer or asks to process their inbox.
 ---
 
 # Graveyard Killer
@@ -13,11 +13,14 @@ Talk to the user in the language set in their Library's **Settings**. Keep this 
 
 A **Capture** is the user sending you one post's URL to keep it. It arrives as a link on its own, a link inside an app's share text ("Check out this reel!"), or a link with a short "save this". The user is usually on their phone and wants to send the next post in seconds. So finish a Capture in one turn and ask nothing.
 
+A **Worker run** is the user asking you to process their Inbox ("process my inbox"). It downloads and reads each post on the user's computer, so it needs a shell with the user's own tools. If you have no shell, as in a phone app, tell the user the Worker runs on their computer, in the Claude Desktop Code tab, and stop.
+
 A link that comes with a question or a task ("summarise this", "is this true?") is a request, and a message with no link is ordinary chat. Answer those as usual, without this skill.
 
 Done when you know the job:
 
 - **Capture**: follow the steps below, then [references/capture.md](references/capture.md).
+- **Worker run**: follow the steps below, then [references/worker.md](references/worker.md).
 
 ## 2. Find the Library
 

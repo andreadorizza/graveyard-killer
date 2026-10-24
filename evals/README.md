@@ -26,3 +26,16 @@ Keep this line out of the prompt. The skill reads the first link in the user's m
 **Order.** Empty the test Library's Entries before a run. Evals 6 and 8 test duplicates: run each one right after the eval it repeats (5 and 1), without emptying the Library in between. Every other eval stands alone.
 
 These evals cannot cover what only the phone shows: whether the skill loads in the Claude Android app, whether each app's share menu delivers the link, and whether the phone's web fetch tool accepts the preview URLs. Check those by hand on the Pixel, using the list in the [Capture spec](../.scratch/capture/spec.md#testing-decisions).
+
+## Worker (`worker.json`)
+
+These evals also run in Claude Code on the Mac, with the memory line in place, against the same test Library. Every prompt is "process my inbox". What differs is the Library's state before the run, which each eval's `expected_output` describes as its seed. Seed the Entries by sharing from the phone, or write them into the Entries database by hand, then run the eval.
+
+The Worker downloads and transcribes, so the tools from `post.py check` must be installed first.
+
+**Order:**
+- Evals 1 to 3 can share one run: seed all three Entries, run once, then check each eval's expectations.
+- Eval 4 needs a processed TikTok Entry, so run it after eval 2.
+- Eval 8 (an article) stands alone. Eval 9 checks after any run.
+
+The post script itself is tested in `tests/test_post.py` with fake tools and no network, and in `tests/test_post_live.py` against the real tools (`uv run pytest -m live`).

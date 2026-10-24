@@ -1,0 +1,105 @@
+{
+  "skill_name": "graveyard-killer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: the Instagram reel Entry from a phone Capture (link only, fallback Category, Note set). It ends Processed with the post's content.",
+      "files": [],
+      "expectations": [
+        "The reel Entry's Status is the Library's label for Processed and its Note is empty",
+        "Its Author is the account handle and its Caption holds the post's full caption",
+        "Its page body has a Transcript section, and an On-screen text section if the video shows text",
+        "Its Title is no longer the link or Capture's '<Platform> post' title",
+        "Its Category is a non-fallback Category when one fits the post",
+        "It has a page cover",
+        "The reply is in the Settings language and counts it as Processed"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: the TikTok Entry captured from a vm.tiktok.com short link. Its Link becomes the full post link, and it ends Processed.",
+      "files": [],
+      "expectations": [
+        "The TikTok Entry's Link is https://www.tiktok.com/@<user>/video/<id> with no query string",
+        "Its Status is the Library's label for Processed",
+        "Its Caption and Author are filled"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: the YouTube Entry Capture already previewed. The Worker keeps its Title and adds the description and a transcript.",
+      "files": [],
+      "expectations": [
+        "The YouTube Entry keeps the Title Capture wrote",
+        "Its Caption holds the video's description",
+        "Its page body has a Transcript section",
+        "Its Status is the Library's label for Processed"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: a Processed TikTok Entry, and a newer Inbox Entry holding a different vm.tiktok.com short link to the same video. The newer one is merged into the older one.",
+      "files": [],
+      "expectations": [
+        "The newer Entry is in the Notion trash",
+        "The older Entry's page body gains a 'Captured again on <date>' line with the newer Entry's Captured date",
+        "The reply counts one merged Entry"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: an Inbox Entry for https://www.youtube.com/watch?v=aaaaaaaaaaa, a video that does not exist. It ends Unavailable.",
+      "files": [],
+      "expectations": [
+        "The Entry's Status is the Library's label for Unavailable",
+        "Its Note says why, in the Settings language",
+        "No other field of the Entry changed"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: no Entry has Status Inbox. The Worker reports that there is nothing to do.",
+      "files": [],
+      "expectations": [
+        "No Entry is created, changed or moved to the trash",
+        "The reply says there is nothing to process"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: an Inbox Entry whose Category the user set by hand to a non-fallback Category. The Worker keeps it.",
+      "files": [],
+      "expectations": [
+        "The Entry's Category is unchanged",
+        "Its Status is the Library's label for Processed"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "process my inbox",
+      "expected_output": "Seed: an Inbox Entry with Platform Other for an article, with an empty Summary and a Note. It ends Processed.",
+      "files": [],
+      "expectations": [
+        "The article Entry's Summary and Next action are written in the Settings language",
+        "Its Status is the Library's label for Processed and its Note is empty",
+        "No post script read ran for it"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "process my inbox",
+      "expected_output": "After any of the runs above, no work folder is left on disk.",
+      "files": [],
+      "expectations": [
+        "No folder named graveyard-killer-* remains in the system temp folder after the run"
+      ]
+    }
+  ]
+}

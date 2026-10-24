@@ -9,6 +9,8 @@ dev = ["pytest>=8", "mypy>=1.10"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["live: calls the real tools and the network; run with -m live"]
+addopts = "-m 'not live'"
 
 [tool.mypy]
 strict = true
