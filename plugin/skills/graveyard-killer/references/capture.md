@@ -42,7 +42,7 @@ You have chosen Capture, found the Library and read its Settings (see SKILL.md).
    - **Tags:** up to 3. Reuse Tags already in the Library where they fit.
 
    **With no preview:**
-   - The Title is "<Platform> post by <author>", or the link itself when you do not know the author.
+   - The Title is "<Platform> post by <author>", or "<Platform> post" when you do not know the author. Write it in the Settings language, for example "Post TikTok".
    - Leave Summary and Next action empty.
    - Use the fallback Category.
    - Set the Note to say that only the link was saved and the Worker will fill in the rest.
