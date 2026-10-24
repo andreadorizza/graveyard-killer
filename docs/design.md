@@ -77,7 +77,7 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 ## To verify while building
 
 - [x] The plugin's skill loads in the Claude Android app, and Capture works from Instagram's share menu. (Pixel, 2026-10-24: the Entry was created with Status Inbox.)
-- [ ] The synced plugin loads in the Desktop Code tab and inside its scheduled tasks.
+- [ ] The synced plugin loads in the Desktop Code tab and inside its scheduled tasks. (2026-10-24: it loads in a new Code tab session. Scheduled tasks are not tested yet.)
 - [ ] ✗ Claude's fetch tool reads the caption from the embed page. (2026-10-24: refused on the Pixel. From a home connection, the embed page is now a page that JavaScript fills in, with no caption in its HTML, even for public posts.)
 - [ ] Claude's fetch tool on the phone accepts a preview URL that the agent built (the embed page, YouTube oEmbed). Its docs say it fetches only URLs already in the conversation. (2026-10-24 on the Pixel: every Instagram preview URL was refused. A YouTube Short got a full preview, with author, title, Summary and Next action. Which of its two preview URLs served it is not recorded.)
 - [ ] ✗ The fetch tool's text keeps the TikTok caption and the YouTube description from the post page. Their oEmbed endpoints do not return them. (2026-10-24 on the Pixel: a shared TikTok gave no preview at all. YouTube gave the title but not the description.)
