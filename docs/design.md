@@ -84,6 +84,10 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 - [x] A shared link with no text triggers the skill in the Android app, through the skill's description alone. Memory holds no Capture rule to fall back on. (Pixel, 2026-10-24.)
 - [ ] TikTok short links and Instagram `/share/` links resolve to one canonical link, so the same post shared twice stays one Entry. (2026-10-24: TikTok's Android share gives a `vm.tiktok.com` short link. Capture could not resolve it on the Pixel, so the Worker must. yt-dlp resolves it: the `webpage_url` it returns, run through the link script, gives the canonical link.)
 - [ ] The Notion connector stores a 2,200-character caption in one field.
+- [ ] The Notion connector uploads a local file and sets it as an Entry's page cover.
+- [ ] The Notion connector moves an Entry to the trash (used for merging duplicates).
+- [ ] gallery-dl reads Instagram carousels and photo posts without a login.
+- [ ] yt-dlp or gallery-dl reads TikTok photo posts.
 - [ ] Claude's Sheets connector can append rows to an existing sheet.
 - [ ] The Instagram export parser handles a real export, including collections with no save date.
 - [x] Anonymous yt-dlp works for public reels from a home connection. (2026-10-24, yt-dlp 2026.10.21, metadata only, no cookies: an Instagram reel gave its author, its full caption and 8 formats. A TikTok short link gave its author, its caption and 10 formats.)
