@@ -1,6 +1,6 @@
 ---
 name: graveyard-killer
-description: Capture a shared post into the user's Graveyard Killer Library. Use when a message is a link (Instagram, TikTok, YouTube or any web page), alone, inside an app's share text, or with a short "save this", or when the user names Graveyard Killer.
+description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request: a bare link, a link inside an app's share text, or a link with a short "save this". Also use when the user names Graveyard Killer.
 ---
 
 # Graveyard Killer
@@ -21,10 +21,10 @@ Done when you know the job:
 
 ## 2. Find the Library
 
-Look in your memory for this line: "When I share a social link without text, file it in my graveyard-killer Library at <link>, following the Settings there." Done when you hold the Library link.
+Look in your memory for the Library's location, saved as one line: `Graveyard Killer Library: <link>`. Done when you hold the Library link.
 
 - If the line is missing, ask the user once for the link to their Graveyard Killer Library page in Notion. If they have no Library yet, tell them a Library is created during Setup on their computer, and stop.
-- With the link in hand, save the line above to your memory if you can. If you cannot, give the user the exact line and ask them to add it to your memory or custom instructions.
+- With the link in hand, save that line to your memory if you can. If you cannot, give the user the exact line and ask them to add it to your memory or custom instructions.
 
 ## 3. Read the Settings
 

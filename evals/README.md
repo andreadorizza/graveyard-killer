@@ -9,7 +9,7 @@ These evals run on the Mac in Claude Code with the Notion connector, against a t
 **Memory.** Every eval except 12 runs with the memory line in place. In Claude Code, memory is a `CLAUDE.md` in the folder the eval runs in:
 
 ```
-When I share a social link without text, file it in my graveyard-killer Library at <test Library link>, following the Settings there.
+Graveyard Killer Library: <test Library link>
 ```
 
 Keep this line out of the prompt. The skill reads the first link in the user's message, so a Library link in the prompt would be filed as the post. Run eval 12 in a folder without this file.

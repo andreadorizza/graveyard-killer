@@ -71,7 +71,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
 37. As a phone user, I want the agent to find my Library from one line in memory, so that I never paste the link again.
 38. As a phone user, I want the agent to ask me for the Library link once when the memory line is missing, so that a fresh surface still works.
 39. As a phone user, I want the agent to save the memory line itself where it can, or tell me the exact line to add where it cannot, so that I only answer once.
-40. As a phone user, I want Capture to keep working from the memory line alone if the app cannot run the skill, so that a skill-loading problem does not stop my Captures (ADR 0002).
+40. As a phone user, I want the skill to start on its own when I share a link, so that I never type an instruction.
 41. As a Library owner, I want the agent to read my Settings before it writes, so that field names, Status names and Categories match my Library exactly.
 42. As a Library owner, I want a clear message when the Library or its Settings cannot be read, so that I can fix the connector or the link.
 
@@ -173,7 +173,7 @@ This spec also delivers the parts that every later job depends on: the plugin ma
   - **Statuses:** a two-column table that maps each canonical Status to the Library's label.
   - **Categories:** a table with four columns: name, what goes in it, its own fields, and Fallback, which is marked on exactly one row.
   - **Schedule:** the Worker's weekday. Capture does not read it.
-- **The memory line** follows ADR 0002: "When I share a social link without text, file it in my graveyard-killer Library at <link>, following the Settings there."
+- **The memory line** holds only the Library's location: `Graveyard Killer Library: <link>`. The Capture instructions live only in the skill (ADR 0002).
 - Creating the Library is Setup's job and is out of scope here. For this slice, the agent creates one test Library on the Mac by hand from the contract. It is not a skill feature.
 
 ## Testing Decisions
@@ -223,6 +223,6 @@ This spec also delivers the parts that every later job depends on: the plugin ma
 - **TikTok previews:** the oEmbed endpoint returns only a player iframe, with no title or author (checked 2026-10-23). The caption sits in JSON embedded in the post page. It is unknown whether the web fetch tool's text output keeps it.
 - **YouTube previews:** oEmbed returns the title and the author, with no description (checked 2026-10-23). The description sits in JSON embedded in the watch page.
 - **Short links:** TikTok short links and Instagram `/share/` links cannot be made canonical without a redirect. If the fetched page does not reveal the canonical link, two Captures of the same post through different short links can create two Entries.
-- **Skill triggering:** a bare link with no words may not trigger the skill. The memory line, which carries the Capture rule (ADR 0002), is the fallback. The Pixel run tests both.
+- **Skill triggering:** a bare link with no words may not trigger the skill. Memory holds no Capture rule to fall back on (ADR 0002), so the skill's description must do it alone. If the Pixel run shows weak triggering, sharpen the description.
 - **Caption length:** Instagram captions run to 2,200 characters. Check that the Notion connector stores a caption that long in one text field.
 - design.md's "To verify while building" list now includes these risks.

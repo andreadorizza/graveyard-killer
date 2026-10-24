@@ -81,7 +81,7 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 - [ ] Claude's fetch tool reads the caption from the embed page.
 - [ ] Claude's fetch tool on the phone accepts a preview URL that the agent built (the embed page, YouTube oEmbed). Its docs say it fetches only URLs already in the conversation.
 - [ ] The fetch tool's text keeps the TikTok caption and the YouTube description from the post page. Their oEmbed endpoints do not return them.
-- [ ] A shared link with no text triggers the skill in the Android app. If it does not, the Capture rule in the memory line does.
+- [ ] A shared link with no text triggers the skill in the Android app, through the skill's description alone. Memory holds no Capture rule to fall back on.
 - [ ] TikTok short links and Instagram `/share/` links resolve to one canonical link, so the same post shared twice stays one Entry.
 - [ ] The Notion connector stores a 2,200-character caption in one field.
 - [ ] Claude's Sheets connector can append rows to an existing sheet.
