@@ -42,9 +42,9 @@ An article or any other page has no media to read. If its Summary is empty, read
 
 3. **Act on its `status`.** Done when the Entry has its result:
    - `ok`: if its `link` differs from the Entry's Link, [merge a duplicate](#merge-a-duplicate) first. Otherwise, [finish the Entry](#finish-the-entry).
-   - `unavailable`: set Status to the Library's label for Unavailable. Set the Note to the `reason`, in the Settings language. Change nothing else.
+   - `unavailable`: set Status to the Library's label for Unavailable. Set the Note to the `reason`, said in the Settings language. Change nothing else.
    - `needs_login` on Instagram: Instagram challenged the run. Leave the Entry in the Inbox, and set its Note to say that Instagram asked for a login and the next run will retry. Give every remaining Instagram Entry in the list the same Note without reading it. TikTok and YouTube Entries carry on, since the risk is Instagram's.
-   - `needs_login` on another platform, or `error`: leave the Entry in the Inbox, set the Note to the `reason`, and go on.
+   - `needs_login` on another platform, or `error`: leave the Entry in the Inbox, set the Note to the `reason`, said in the Settings language, and go on.
 
 4. **Clean up,** whatever the result, when `work` is not null:
 
@@ -72,11 +72,11 @@ Read the `caption` and the `transcript`. Look at every image in `keyframes` with
 
 - a Title, if the rules let you replace it;
 - a Summary of two or three sentences on what the post says and shows;
-- one Next action that starts with a verb;
+- one Next action that starts with a verb: what the user could do with the post's content (try, cook, read, visit). A creator's "comment X to get Y" is a Next action only when it is the only way to the content;
 - a Category, if the rules let you replace it, and the empty Category fields whose values the post states;
 - Tags, at most 5 on the Entry;
 - Author and Caption from `author` and `caption`;
-- in the page body, a Transcript section with one paragraph per item in `transcript_blocks`, and an On-screen text section with what the keyframes show, leaving out a section that would be empty;
+- in the page body, a Transcript section with one paragraph per item in `transcript_blocks`, and an On-screen text section with what the keyframes show, leaving out a section that would be empty. When the video has no speech, only music, the transcript is song lyrics or noise: leave the Transcript section out and say in the Summary that the video has only music;
 - the page cover, when `cover_url` is not null: set it as the cover's external link. With no `cover_url`, the Entry has no cover.
 
-Done when every write has succeeded. Then set Status to the Library's label for Processed and clear the Note. If any write failed, leave the Entry in the Inbox and set the Note to what failed.
+Write page content in the form your Notion connector asks for. Done when every write has succeeded. Then set Status to the Library's label for Processed and clear the Note. If any write failed, leave the Entry in the Inbox and set the Note to what failed.

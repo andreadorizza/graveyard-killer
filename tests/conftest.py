@@ -91,8 +91,11 @@ def post(tmp_path: Path) -> Iterator[Callable[..., Run]]:
         scenario_file = tmp_path / "scenario.json"
         scenario_file.write_text(json.dumps(scenario or {}))
         log.write_text("")
+        temp = tmp_path / "temp"  # work folders land here, inside pytest's own cleaned-up folder
+        temp.mkdir(exist_ok=True)
         full_env = {
             **os.environ,
+            "TMPDIR": str(temp),
             **(env or {}),
             "PATH": os.pathsep.join([str(bin_dir), str(Path(sys.executable).parent)]),
             "GK_FAKE_SCENARIO": str(scenario_file),

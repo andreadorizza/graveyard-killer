@@ -42,7 +42,7 @@ You have chosen Capture, found the Library and read its Settings (see SKILL.md).
    - **Tags:** up to 3, in the Settings language. Reuse Tags already in the Library where they fit. A new Tag must first be added to the Tag property's options, as [library.md](library.md#writing-to-notion) explains.
 
    **With no preview:**
-   - The Title is "<Platform> post by <author>", or "<Platform> post" when you do not know the author. Write it in the Settings language, for example "Post TikTok".
+   - The Title is exactly "<Platform> post by <author>", or "<Platform> post" when you do not know the author, in the Settings language, for example "Post TikTok". Add nothing to it: the Worker recognises this title and replaces it.
    - Leave Summary and Next action empty.
    - Use the fallback Category.
    - Set the Note to say that only the link was saved and the Worker will fill in the rest.

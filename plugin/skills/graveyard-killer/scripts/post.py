@@ -39,8 +39,8 @@ AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
 NOTION_UPLOAD_LIMIT = 5 * 1024 * 1024  # bytes, on Notion's Free plan
 NOTION_TEXT_BLOCK = 1800  # characters per page-body block, under Notion's 2,000 limit
 # Matched, in this order and ignoring case, against the tool's last error line.
-NEEDS_LOGIN = ("rate-limit reached", "login required", "sign in to confirm",
-               "checkpoint_required", "challenge_required", "authorizationerror")
+NEEDS_LOGIN = ("rate-limit reached", "login required", "redirect to login", "/accounts/login",
+               "sign in to confirm", "checkpoint_required", "challenge_required", "authorizationerror")
 UNAVAILABLE = ("video unavailable", "private video", "this video is private", "removed by",
                "http error 404", "404 not found", "does not exist", "this post is unavailable")
 NO_VIDEO = ("no video", "unsupported url")
@@ -198,19 +198,51 @@ def read_video(link: str, info: dict[str, Any], folder: Path, hint: str | None) 
 
 
 def read_photos(link: str, folder: Path) -> dict[str, Any]:
-    """Photo posts and carousels: yt-dlp downloads video only, so gallery-dl takes over."""
+    """Photo posts and carousels: yt-dlp downloads no video, but saves each slide's image.
+
+    gallery-dl reads the posts yt-dlp returns no images for. Checked without a login
+    on a real 7-slide Instagram carousel, 2026-10-25.
+    """
     images_dir = folder / "images"
+    asked = subprocess.run(
+        # --no-simulate: without it, --dump-single-json writes no files at all.
+        ["yt-dlp", *ANONYMOUS, "--ignore-no-formats-error", "--skip-download", "--no-simulate",
+         "--dump-single-json", "--no-warnings", "--write-thumbnail", "--convert-thumbnails", "jpg",
+         "-o", str(images_dir / "%(playlist_index)02d.%(ext)s"), "--", link],
+        capture_output=True, text=True,
+    )
+    if asked.returncode != 0 and matches(last_error(asked.stderr), NEEDS_LOGIN):
+        return not_ok(link, folder, asked.stderr)  # asking gallery-dl would only meet the same challenge
+    info: dict[str, Any] = json.loads(asked.stdout) if asked.returncode == 0 and asked.stdout.strip() else {}
+    images = images_in(images_dir)
+    if images:
+        canonical = parse_link(info.get("webpage_url") or link)
+        return photos(canonical, folder, images, author_of(info, canonical["platform"]),
+                      info.get("description") or "")
     fetched = subprocess.run(
         ["gallery-dl", "--config-ignore", "--write-metadata", "-D", str(images_dir), "--", link],
         capture_output=True, text=True,
     )
     if fetched.returncode != 0:
         return not_ok(link, folder, fetched.stderr)
-    images = sorted(f for f in images_dir.glob("*") if f.suffix.lower() in IMAGE_TYPES)[:MAX_IMAGES]
+    images = images_in(images_dir)
     if not images:
-        return not_ok(link, folder, "gallery-dl found no images in the post")
+        return not_ok(link, folder, "no images found in the post")
     metadata_file = Path(f"{images[0]}.json")
     metadata: dict[str, Any] = json.loads(metadata_file.read_text()) if metadata_file.exists() else {}
+    return photos(parse_link(info.get("webpage_url") or link), folder, images,
+                  first_text(metadata, "username", "uploader", "author", "user"),
+                  first_text(metadata, "description", "desc", "content", "caption") or "")
+
+
+def images_in(folder: Path) -> list[Path]:
+    if not folder.is_dir():
+        return []
+    return sorted(f for f in folder.glob("*") if f.suffix.lower() in IMAGE_TYPES)[:MAX_IMAGES]
+
+
+def photos(canonical: dict[str, Any], folder: Path, images: list[Path], author: str | None,
+           caption: str) -> dict[str, Any]:
     frames_dir = folder / "frames"
     frames_dir.mkdir()
     frames = []
@@ -219,10 +251,10 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
         save_jpeg(image, frame, FRAME_SIZE)
         frames.append(frame)
     return ok(
-        parse_link(link), folder, "photos", frames, thumbnail(images[0], frames, folder / "thumbnail.jpg"),
-        author=first_text(metadata, "username", "uploader", "author", "user"),
+        canonical, folder, "photos", frames, thumbnail(images[0], frames, folder / "thumbnail.jpg"),
+        author=author,
         title=None,
-        caption=first_text(metadata, "description", "desc", "content", "caption") or "",
+        caption=caption,
         duration=None,
         transcript=None,
         transcript_source="none",

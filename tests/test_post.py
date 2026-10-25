@@ -345,17 +345,29 @@ def slides(media: dict[str, Path]) -> dict[str, Any]:
     }
 
 
+NO_VIDEO = {"exit": 1, "stderr": "ERROR: [Instagram] DAbc123xyz: There is no video in this post"}
+CAROUSEL_INFO = {
+    "_type": "playlist", "id": "DAbc123xyz", "webpage_url": "https://www.instagram.com/p/DAbc123xyz/",
+    "channel": "some.creator", "uploader": "Some Creator | Pasta every day",
+    "description": "Three slides on pasta", "entries": [{}, {}, {}],
+}
+
+
+def carousel_images(media: dict[str, Path], **info: Any) -> dict[str, Any]:
+    """yt-dlp's answer when asked for a photo post's images, without a login."""
+    return {"json": {**CAROUSEL_INFO, **info},
+            "images": [str(media["slide1"]), str(media["slide2"]), str(media["slide3"])]}
+
+
 @pytest.mark.parametrize(
-    "yt_dlp",
-    [
-        {"exit": 1, "stderr": "ERROR: [Instagram] DAbc123xyz: There is no video in this post"},
-        {"json": {"_type": "multi_video", "id": "DAbc123xyz", "entries": [{}]}},
-    ],
+    "first_try",
+    [NO_VIDEO, {"json": {"_type": "multi_video", "id": "DAbc123xyz", "entries": [{}]}}],
 )
-def test_photos_and_carousels_are_read_with_gallery_dl(
-    post: Callable[..., Run], media: dict[str, Path], yt_dlp: dict[str, Any]
+def test_photos_and_carousels_are_read_with_yt_dlp_alone(
+    post: Callable[..., Run], media: dict[str, Path], first_try: dict[str, Any]
 ) -> None:
-    run = post("read", CAROUSEL, scenario={"yt-dlp": [yt_dlp], "gallery-dl": [slides(media)]})
+    # Checked on a real 7-slide carousel, 2026-10-25: caption, account and 720x900 images, no login.
+    run = post("read", CAROUSEL, scenario={"yt-dlp": [first_try, carousel_images(media)]})
 
     assert run.output["status"] == "ok"
     assert run.output["kind"] == "photos"
@@ -366,12 +378,32 @@ def test_photos_and_carousels_are_read_with_gallery_dl(
     assert len(run.output["keyframes"]) == 3
     assert all(width(f) <= 1024 for f in run.output["keyframes"])
     assert is_jpeg(run.output["thumbnail"])
+    assert run.called("gallery-dl") == []
 
 
-def test_gallery_dl_login_challenge_needs_login(post: Callable[..., Run]) -> None:
+def test_gallery_dl_reads_the_photos_yt_dlp_cannot(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    scenario = {"yt-dlp": [NO_VIDEO, {"json": {"id": "DAbc123xyz"}}], "gallery-dl": [slides(media)]}
+
+    run = post("read", CAROUSEL, scenario=scenario)
+
+    assert run.output["status"] == "ok"
+    assert run.output["kind"] == "photos"
+    assert run.output["author"] == "some.creator"
+    assert len(run.output["keyframes"]) == 3
+
+
+@pytest.mark.parametrize(
+    "gallery_error",
+    [
+        "[instagram][error] AuthorizationError: Login required",
+        # Seen on the second Worker run, 2026-10-25, for a public photo post.
+        "[instagram][error] HTTP redirect to login page (https://www.instagram.com/accounts/login/)",
+    ],
+)
+def test_gallery_dl_login_challenge_needs_login(post: Callable[..., Run], gallery_error: str) -> None:
     scenario = {
-        "yt-dlp": [{"exit": 1, "stderr": "ERROR: [Instagram] DAbc123xyz: There is no video in this post"}],
-        "gallery-dl": [{"exit": 1, "stderr": "[instagram][error] AuthorizationError: Login required"}],
+        "yt-dlp": [NO_VIDEO, {"json": {"id": "DAbc123xyz"}}],
+        "gallery-dl": [{"exit": 1, "stderr": gallery_error}],
     }
 
     run = post("read", CAROUSEL, scenario=scenario)
@@ -497,12 +529,14 @@ def test_anything_but_a_web_link_is_refused_before_any_tool_runs(
 def test_downloads_are_anonymous_and_at_most_720p(post: Callable[..., Run], media: dict[str, Path]) -> None:
     # Config files can hold cookies or a login; ignoring them keeps every read anonymous.
     photo_error = {"exit": 1, "stderr": "ERROR: [Instagram] Rk3elTest01: There is no video in this post"}
-    run = post("read", REEL, scenario={"yt-dlp": [photo_error], "gallery-dl": [slides(media)]})
+    scenario = {"yt-dlp": [photo_error, {"json": {"id": "Rk3elTest01"}}], "gallery-dl": [slides(media)]}
+    run = post("read", REEL, scenario=scenario)
 
-    yt_dlp = run.called("yt-dlp")[0]
-    assert "--ignore-config" in yt_dlp and "--no-cookies" in yt_dlp
-    assert "height<=720" in yt_dlp[yt_dlp.index("-f") + 1]
-    assert yt_dlp[-2:] == ["--", REEL]
+    download, photos = run.called("yt-dlp")
+    assert "height<=720" in download[download.index("-f") + 1]
+    for yt_dlp in (download, photos):
+        assert "--ignore-config" in yt_dlp and "--no-cookies" in yt_dlp
+        assert yt_dlp[-2:] == ["--", REEL]
     gallery_dl = run.called("gallery-dl")[0]
     assert "--config-ignore" in gallery_dl
     assert gallery_dl[-2:] == ["--", REEL]
@@ -526,8 +560,7 @@ def size(image: str) -> tuple[int, int]:
 
 
 def test_tall_slides_fit_in_a_1024_px_square(post: Callable[..., Run], media: dict[str, Path]) -> None:
-    photo_error = {"exit": 1, "stderr": "ERROR: [Instagram] Rk3elTest01: There is no video in this post"}
-    run = post("read", CAROUSEL, scenario={"yt-dlp": [photo_error], "gallery-dl": [slides(media)]})
+    run = post("read", CAROUSEL, scenario={"yt-dlp": [NO_VIDEO, carousel_images(media)]})
 
     assert all(max(size(f)) <= 1024 for f in run.output["keyframes"])  # the slides are 1080x1350
 
@@ -537,7 +570,7 @@ def test_a_photo_post_behind_a_short_link_gets_its_canonical_link(
 ) -> None:
     resolved = {"_type": "multi_video", "id": "7400000000000000002", "entries": [{}],
                 "webpage_url": "https://www.tiktok.com/@another.creator/photo/7400000000000000002?_r=1"}
-    scenario = {"yt-dlp": [{"json": resolved}], "gallery-dl": [slides(media)]}
+    scenario = {"yt-dlp": [{"json": resolved}, carousel_images(media, **resolved)]}
 
     run = post("read", "https://vm.tiktok.com/ZMphoto01/", scenario=scenario)
 

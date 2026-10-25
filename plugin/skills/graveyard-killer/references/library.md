@@ -30,7 +30,7 @@ The Library uses the user's own names for fields and Statuses, in their language
 | Tags | multi-select | Free labels in the Settings language, at most 5 per Entry (see [Writing to Notion](#writing-to-notion)) |
 | Status | select | One Status (see below) |
 | Captured | date | The date of the first Capture |
-| Note | text | Something about this Entry that needs attention. It is empty when nothing does |
+| Note | text | Something about this Entry that needs attention, in the Settings language. It is empty when nothing does |
 
 Each Category can add its own fields. They are named in the Settings and exist as extra properties in the Entries database.
 
@@ -38,7 +38,7 @@ The Entry's page body holds what does not fit a field:
 
 - one dated line for each extra Capture of the same post;
 - the full caption, when it is longer than 2,000 characters, Notion's limit for one text value;
-- a Transcript section and an On-screen text section, written by the Worker, with headings in the Settings language.
+- a Transcript section and an On-screen text section, written by the Worker. Their headings are "Transcript" and "On-screen text" in the Settings language. Use the same words on every Entry, so look at a Processed Entry for the words already in use (in Italian: "Trascrizione", "Testo a schermo").
 
 ## After Capture
 
@@ -46,7 +46,7 @@ The Worker knows more about a post than Capture did, and the user may have edite
 
 | Field | The Worker |
 | --- | --- |
-| Title | Replaces it only if it is empty, a bare link, or Capture's no-preview title ("<Platform> post", in any language, such as "Post Instagram") |
+| Title | Replaces it only if it is empty, a bare link, or a title that only names the platform and maybe the author, as Capture writes with no preview ("Post Instagram", "Post TikTok di ia_dori", "Post Instagram (solo link)") |
 | Category | Replaces it only if it is the fallback Category |
 | Summary, Next action | Rewrites them from the full post |
 | Tags | Adds Tags and never removes one |

@@ -9,7 +9,8 @@ scenario in $GK_FAKE_SCENARIO:
 
 A response may hold: exit, stderr, json (printed; a string is printed as is),
 media and thumbnail (files copied to where yt-dlp would write them), subs
-(a VTT text), images and metadata (gallery-dl), text and language (Parakeet and Whisper).
+(a VTT text), images (yt-dlp photo posts, gallery-dl), metadata (gallery-dl), text and
+language (Parakeet and Whisper).
 """
 
 from __future__ import annotations
@@ -53,7 +54,16 @@ if tool == "yt-dlp":
         print(raw)
         sys.exit(0)
     info = dict(raw)
-    if "--skip-download" in argv:
+    # Like the real yt-dlp: --dump-single-json simulates, writing no files, unless --no-simulate.
+    simulating = "--dump-single-json" in argv and "--no-simulate" not in argv
+    if simulating:
+        pass
+    elif "--ignore-no-formats-error" in argv:  # a photo post: save each entry's image
+        folder = Path(template).parent
+        folder.mkdir(parents=True, exist_ok=True)
+        for i, image in enumerate(response.get("images", []), start=1):
+            shutil.copy(image, folder / f"{i:02d}{Path(image).suffix}")
+    elif "--skip-download" in argv:
         langs = option("--sub-langs")
         Path(f"{base}.{langs}.vtt").write_text(response["subs"])
     else:
