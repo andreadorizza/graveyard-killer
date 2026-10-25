@@ -39,7 +39,7 @@ You have chosen Capture, found the Library and read its Settings (see SKILL.md).
    - **Next action:** one action that starts with a verb, such as "Try this recipe this weekend".
    - **Category:** the best fit from the Settings. If none fits, use the fallback Category. Use the Settings' Categories exactly as written.
    - **Category fields:** fill in only the values the preview states.
-   - **Tags:** up to 3. Reuse Tags already in the Library where they fit.
+   - **Tags:** up to 3, in the Settings language. Reuse Tags already in the Library where they fit. A new Tag must first be added to the Tag property's options, as [library.md](library.md#writing-to-notion) explains.
 
    **With no preview:**
    - The Title is "<Platform> post by <author>", or "<Platform> post" when you do not know the author. Write it in the Settings language, for example "Post TikTok".
@@ -47,11 +47,11 @@ You have chosen Capture, found the Library and read its Settings (see SKILL.md).
    - Use the fallback Category.
    - Set the Note to say that only the link was saved and the Worker will fill in the rest.
 
-5. **Create the Entry** in the Entries database. Use the Library's field names and its label for Status Inbox. Done when the connector confirms the new Entry. Its fields are:
+5. **Create the Entry** in the Entries database. Use the Library's field names and its label for Status Inbox, and write text as [library.md](library.md#writing-to-notion) explains. Done when the connector confirms the new Entry. Its fields are:
    - Title, Summary, Next action, Category, Category fields and Tags: from step 4
    - Link: the canonical `link`
    - Platform: Instagram, TikTok, YouTube or Other
-   - Author and Caption: from the preview. If the caption is too long for the field, put its start in Caption and the full text in the page body
+   - Author and Caption: from the preview. If the caption is longer than 2,000 characters, put its start in Caption and the full text in the page body
    - Status: Inbox
    - Captured: today
    - Note: when step 4 set one

@@ -554,3 +554,41 @@ def test_many_scenes_give_at_most_8_distinct_keyframes(post: Callable[..., Run],
     frames = run.output["keyframes"]
     assert len(frames) == 8
     assert len({Path(f).read_bytes() for f in frames}) == 8
+
+
+def test_youtube_gets_a_stable_cover_url(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    # Notion's connector takes only an external URL as a cover, and YouTube's image host is stable.
+    run = post("read", VIDEO, scenario=youtube(media))
+
+    assert run.output["cover_url"] == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+
+
+def test_instagram_and_tiktok_get_no_cover_url(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    # Their image links are signed and expire within days.
+    run = post("read", REEL, scenario=reel(media))
+
+    assert run.output["cover_url"] is None
+
+
+def test_a_long_transcript_comes_in_blocks_that_fit_notion(
+    post: Callable[..., Run], media: dict[str, Path]
+) -> None:
+    sentence = "Soak the chickpeas overnight, then roast them until they are crisp. "
+    scenario = reel(media)
+    scenario["parakeet-mlx"] = scenario["mlx_whisper"] = scenario["whisper-ctranslate2"] = [
+        {"text": sentence * 100, "language": "en"}
+    ]
+
+    run = post("read", REEL, scenario=scenario)
+
+    blocks = run.output["transcript_blocks"]
+    assert len(blocks) > 1
+    assert all(0 < len(b) <= 1800 for b in blocks)
+    assert all(b.endswith(".") for b in blocks)  # split between sentences
+    assert " ".join(blocks) == run.output["transcript"]
+
+
+def test_a_short_transcript_is_one_block(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    run = post("read", REEL, scenario=reel(media))
+
+    assert run.output["transcript_blocks"] == [run.output["transcript"]]

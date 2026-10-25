@@ -37,6 +37,7 @@ WEB_LINK = re.compile(r"^https?://\S+$", re.IGNORECASE)
 ANONYMOUS = ("--ignore-config", "--no-cookies")
 AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
 NOTION_UPLOAD_LIMIT = 5 * 1024 * 1024  # bytes, on Notion's Free plan
+NOTION_TEXT_BLOCK = 1800  # characters per page-body block, under Notion's 2,000 limit
 # Matched, in this order and ignoring case, against the tool's last error line.
 NEEDS_LOGIN = ("rate-limit reached", "login required", "sign in to confirm",
                "checkpoint_required", "challenge_required", "authorizationerror")
@@ -239,10 +240,47 @@ def ok(canonical: dict[str, Any], folder: Path, kind: str, frames: list[Path], t
         "id": canonical["id"],
         "kind": kind,
         **post,
+        "transcript_blocks": blocks(post.get("transcript") or ""),
         "keyframes": [str(f) for f in frames],
         "thumbnail": str(thumb),
+        "cover_url": cover_url(canonical),
         "work": str(folder),
     }
+
+
+def cover_url(canonical: dict[str, Any]) -> str | None:
+    """A cover image link that will not expire, for platforms that have one.
+
+    Notion's connector sets a cover only from an external link. YouTube's image
+    host is stable; Instagram's and TikTok's links are signed and expire.
+    """
+    if canonical["platform"] == "youtube" and canonical["id"]:
+        return f"https://i.ytimg.com/vi/{canonical['id']}/hqdefault.jpg"
+    return None
+
+
+def blocks(text: str) -> list[str]:
+    """The text in pieces of at most NOTION_TEXT_BLOCK characters, split between sentences."""
+    pieces: list[str] = []
+    current = ""
+    for sentence in re.split(r"(?<=[.!?…])\s+", text.strip()):
+        while len(sentence) > NOTION_TEXT_BLOCK:  # one sentence too long for a block: cut at a space
+            cut = sentence.rfind(" ", 0, NOTION_TEXT_BLOCK)
+            if cut <= 0:
+                cut = NOTION_TEXT_BLOCK
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(sentence[:cut])
+            sentence = sentence[cut:].lstrip()
+        if current and len(current) + 1 + len(sentence) > NOTION_TEXT_BLOCK:
+            pieces.append(current)
+            current = sentence
+        else:
+            current = f"{current} {sentence}" if current else sentence
+    if current:
+        pieces.append(current)
+    return pieces
 
 
 def first_text(metadata: dict[str, Any], *keys: str) -> str | None:

@@ -27,7 +27,7 @@ The Library uses the user's own names for fields and Statuses, in their language
 | Category | select | One Category from the Settings |
 | Summary | text | In the Settings language: one or two sentences at Capture, two or three after the Worker |
 | Next action | text | The one thing the user could do with it |
-| Tags | multi-select | Free labels |
+| Tags | multi-select | Free labels in the Settings language, at most 5 per Entry (see [Writing to Notion](#writing-to-notion)) |
 | Status | select | One Status (see below) |
 | Captured | date | The date of the first Capture |
 | Note | text | Something about this Entry that needs attention. It is empty when nothing does |
@@ -37,7 +37,7 @@ Each Category can add its own fields. They are named in the Settings and exist a
 The Entry's page body holds what does not fit a field:
 
 - one dated line for each extra Capture of the same post;
-- the full caption, when it is too long for the Caption field;
+- the full caption, when it is longer than 2,000 characters, Notion's limit for one text value;
 - a Transcript section and an On-screen text section, written by the Worker, with headings in the Settings language.
 
 ## After Capture
@@ -46,7 +46,7 @@ The Worker knows more about a post than Capture did, and the user may have edite
 
 | Field | The Worker |
 | --- | --- |
-| Title | Replaces it only if it is empty or still Capture's "<Platform> post…" title |
+| Title | Replaces it only if it is empty, a bare link, or Capture's no-preview title ("<Platform> post", in any language, such as "Post Instagram") |
 | Category | Replaces it only if it is the fallback Category |
 | Summary, Next action | Rewrites them from the full post |
 | Tags | Adds Tags and never removes one |
@@ -54,7 +54,13 @@ The Worker knows more about a post than Capture did, and the user may have edite
 | Author, Caption | Sets them from the post |
 | Link | Replaces a short link with the post's canonical link |
 
-When a resolved link shows that two Entries hold the same post, the older Entry stays. The newer one goes to the Notion trash, and the older one gains a "Captured again on <date>" line.
+When a resolved link shows that two Entries hold the same post, the older Entry stays and gains a "Captured again on <date>" line. The newer one gets the Note "Duplicate of <link to the older Entry>" and goes to the Notion trash once the user agrees, since Notion's connector trashes a page only on the user's say-so.
+
+## Writing to Notion
+
+- **Tags.** A multi-select only accepts values that are already among its options. Reuse an existing Tag wherever one fits. To add a new Tag, add it to the Tag property's options first. The connector's update replaces the whole option list, so read the current options and send every one of them along with the new ones. Leaving one out deletes it from every Entry.
+- **Markdown.** The connector reads text values as Markdown. In text that comes from the post, such as Caption, Author and transcripts, put a backslash before `*`, `_`, `` ` ``, `[` and `]`, so the text stays as the creator wrote it.
+- **Long text.** One text value or page-body block holds at most 2,000 characters. Split longer text into blocks, between sentences.
 
 ## Statuses
 

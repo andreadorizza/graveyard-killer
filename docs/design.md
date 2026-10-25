@@ -83,9 +83,10 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 - [ ] ✗ The fetch tool's text keeps the TikTok caption and the YouTube description from the post page. Their oEmbed endpoints do not return them. (2026-10-24 on the Pixel: a shared TikTok gave no preview at all. YouTube gave the title but not the description.)
 - [x] A shared link with no text triggers the skill in the Android app, through the skill's description alone. Memory holds no Capture rule to fall back on. (Pixel, 2026-10-24.)
 - [ ] TikTok short links and Instagram `/share/` links resolve to one canonical link, so the same post shared twice stays one Entry. (2026-10-24: TikTok's Android share gives a `vm.tiktok.com` short link. Capture could not resolve it on the Pixel, so the Worker must. yt-dlp resolves it: the `webpage_url` it returns, run through the link script, gives the canonical link.)
-- [ ] The Notion connector stores a 2,200-character caption in one field.
-- [ ] The Notion connector uploads a local file and sets it as an Entry's page cover.
-- [ ] The Notion connector moves an Entry to the trash (used for merging duplicates).
+- [ ] The Notion connector stores a 2,200-character caption in one field. (Notion's limit is 2,000 characters per text value, so longer captions overflow into the page body. The connector also reads text as Markdown, so `*` and `_` must be escaped.)
+- [x] The Worker finishes the Inbox by hand. (2026-10-25, a fresh agent following only the skill's files, on 3 Entries: all Processed in about 16 minutes. Parakeet transcribed all three. The TikTok short link resolved. Reading took 23 s for the reel, 4 m 49 s for a 10-minute video and 4 m 26 s for a 14-minute one.)
+- [ ] ✗ The Notion connector uploads a local file and sets it as an Entry's page cover. (2026-10-25: the upload works, but a page cover can only be an external link. YouTube Entries use the stable `i.ytimg.com` thumbnail; Instagram and TikTok links expire, so those Entries get no cover.)
+- [ ] The Notion connector moves an Entry to the trash (used for merging duplicates). (2026-10-25: it trashes a page only on the user's explicit say-so, so the Worker asks at the end of the run. A real duplicate has not been tested yet.)
 - [ ] gallery-dl reads Instagram carousels and photo posts without a login.
 - [ ] yt-dlp or gallery-dl reads TikTok photo posts.
 - [ ] Claude's Sheets connector can append rows to an existing sheet.
