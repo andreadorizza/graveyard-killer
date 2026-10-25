@@ -4,8 +4,8 @@
     post.py read [<link>] [--language <code>]   the link comes on stdin when left out
     post.py clean <folder>           delete a work folder that read made
 
-Calls yt-dlp, gallery-dl, ffmpeg, ffprobe and Whisper as outside programs found
-on PATH. Standard library only.
+Calls yt-dlp, gallery-dl, ffmpeg, ffprobe, Parakeet and Whisper as outside
+programs found on PATH. Standard library only.
 
 The caption choice, the keyframe sampling, the work-folder clean-up and the
 update-and-retry on a 403 follow claude-video's /watch skill (MIT,
@@ -56,9 +56,8 @@ DUPLICATE_DIFFERENCE = 10
 def check() -> dict[str, Any]:
     """Which tools are missing, each with the command that installs it on this computer.
 
-    Also says whether the speech model is downloaded yet: it is about 1.6 GB.
+    Also says whether the first-choice speech model is downloaded yet: it is over 1 GB.
     """
-    build = whisper()
     ffmpeg_install = {"Darwin": "brew install ffmpeg",
                       "Windows": "winget install --id Gyan.FFmpeg --exact"}.get(system(), "sudo apt install ffmpeg")
     uv_install = ('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'
@@ -69,13 +68,13 @@ def check() -> dict[str, Any]:
         ("gallery-dl", "gallery-dl", "uv tool install gallery-dl"),
         ("ffmpeg", "ffmpeg", ffmpeg_install),
         ("ffprobe", "ffmpeg", ffmpeg_install),  # ffprobe ships with ffmpeg
-        (build.program, "whisper", f"uv tool install {build.package}"),
+        *((engine.program, engine.name, f"uv tool install {engine.package}") for engine in engines()),
     ]
     missing: list[dict[str, str]] = []
     for program, name, install in needed:
         if not shutil.which(program) and all(m["tool"] != name for m in missing):
             missing.append({"tool": name, "install": install})
-    return {"ok": not missing, "missing": missing, "speech_model": speech_model(build)}
+    return {"ok": not missing, "missing": missing, "speech_model": speech_model(engines()[0])}
 
 
 def clean(folder: Path) -> dict[str, Any]:
@@ -87,35 +86,57 @@ def clean(folder: Path) -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class Whisper:
-    """One build of Whisper turbo: its program, the package that installs it, and its options."""
+class Engine:
+    """One speech-to-text program: how results name it, how to run it, and how to install it."""
 
+    name: str  # "parakeet" or "whisper", as transcript_source reports it
     program: str
     package: str
     options: tuple[str, ...]  # model and JSON output; the output folder comes last
     model_cache: str | None  # Hugging Face cache folder of its model, when known
 
 
-MLX_WHISPER = Whisper("mlx_whisper", "mlx-whisper",
-                      ("--model", "mlx-community/whisper-large-v3-turbo", "--output-format", "json",
-                       "--output-dir"),
-                      "models--mlx-community--whisper-large-v3-turbo")
-CT2_WHISPER = Whisper("whisper-ctranslate2", "whisper-ctranslate2",
-                      ("--model", "large-v3-turbo", "--output_format", "json", "--output_dir"),
-                      None)
+PARAKEET = Engine("parakeet", "parakeet-mlx", "parakeet-mlx",
+                  ("--model", "mlx-community/parakeet-tdt-0.6b-v3", "--output-format", "json", "--output-dir"),
+                  "models--mlx-community--parakeet-tdt-0.6b-v3")
+MLX_WHISPER = Engine("whisper", "mlx_whisper", "mlx-whisper",
+                     ("--model", "mlx-community/whisper-large-v3-turbo", "--output-format", "json",
+                      "--output-dir"),
+                     "models--mlx-community--whisper-large-v3-turbo")
+CT2_WHISPER = Engine("whisper", "whisper-ctranslate2", "whisper-ctranslate2",
+                     ("--model", "large-v3-turbo", "--output_format", "json", "--output_dir"),
+                     None)
+# Parakeet-TDT v3's 25 European languages, as ISO 639-1 codes.
+PARAKEET_LANGUAGES = {"bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr", "hu", "it",
+                      "lt", "lv", "mt", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "uk"}
 
 
-def whisper() -> Whisper:
-    """The MLX build on Apple Silicon, the CTranslate2 build elsewhere."""
-    return MLX_WHISPER if system() == "Darwin" and machine() == "arm64" else CT2_WHISPER
+def engines() -> list[Engine]:
+    """The engines this computer needs, first choice first.
+
+    On Apple Silicon, Parakeet: faster than Whisper and much less prone to writing
+    words over music or silence. Whisper turbo covers the languages Parakeet lacks.
+    Elsewhere, Whisper turbo alone.
+    """
+    if system() == "Darwin" and machine() == "arm64":
+        return [PARAKEET, MLX_WHISPER]
+    return [CT2_WHISPER]
 
 
-def speech_model(build: Whisper) -> str:
-    if build.model_cache is None:
+def engine_for(language: str | None) -> Engine:
+    """Parakeet for its own languages and for an unknown one; Whisper for any other."""
+    first = engines()[0]
+    if first is PARAKEET and (language is None or language.split("-")[0].lower() in PARAKEET_LANGUAGES):
+        return PARAKEET
+    return engines()[-1]
+
+
+def speech_model(engine: Engine) -> str:
+    if engine.model_cache is None:
         return "unknown"
     cache = os.environ.get("HF_HUB_CACHE") or Path(
         os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface") / "hub"
-    return "downloaded" if (Path(cache) / build.model_cache).is_dir() else "not downloaded"
+    return "downloaded" if (Path(cache) / engine.model_cache).is_dir() else "not downloaded"
 
 
 def read(link: str, language: str | None = None) -> dict[str, Any]:
@@ -161,8 +182,7 @@ def read_video(link: str, info: dict[str, Any], folder: Path, hint: str | None) 
         key, source = track
         transcript, language = captions(info["webpage_url"], key, source, folder), info["language"]
     elif has_audio(media):
-        transcript, language = transcribe(media, folder / "transcript", hint)
-        source = "whisper"
+        transcript, language, source = transcribe(media, folder / "transcript", hint or info.get("language"))
     frames = keyframes(media, folder / "frames")
     return ok(
         canonical, folder, "video", frames, thumbnail(folder / "media.jpg", frames, folder / "thumbnail.jpg"),
@@ -414,15 +434,16 @@ def has_audio(media: Path) -> bool:
     return bool(probe.stdout.strip())
 
 
-def transcribe(media: Path, out_dir: Path, hint: str | None) -> tuple[str, str | None]:
+def transcribe(media: Path, out_dir: Path, language: str | None) -> tuple[str, str | None, str]:
+    """The speech in media, the language it is in when known, and the engine's name."""
     out_dir.mkdir()
-    build = whisper()
-    command = [build.program, str(media), *build.options, str(out_dir)]
-    if hint:
-        command += ["--language", hint]
+    engine = engine_for(language)
+    command = [engine.program, str(media), *engine.options, str(out_dir)]
+    if language and engine.name == "whisper":  # Parakeet takes no language option
+        command += ["--language", language]
     subprocess.run(command, capture_output=True, text=True, check=True)
     result = json.loads((out_dir / f"{media.stem}.json").read_text())
-    return str(result.get("text", "")).strip(), result.get("language")
+    return str(result.get("text", "")).strip(), result.get("language") or language, engine.name
 
 
 def author_of(info: dict[str, Any], platform: str) -> str | None:
@@ -444,7 +465,7 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     read_parser = commands.add_parser("read")
     read_parser.add_argument("link", nargs="?", help="the Entry's Link; read from stdin when left out")
-    read_parser.add_argument("--language", help="spoken-language hint for Whisper, such as it")
+    read_parser.add_argument("--language", help="the spoken language when known, such as it")
     commands.add_parser("check")
     clean_parser = commands.add_parser("clean")
     clean_parser.add_argument("folder", type=Path)

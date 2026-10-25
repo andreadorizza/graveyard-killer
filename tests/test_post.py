@@ -29,9 +29,24 @@ def whisper_calls(run: Run) -> list[list[str]]:
     return run.called("mlx_whisper") + run.called("whisper-ctranslate2")
 
 
+def speech_calls(run: Run) -> list[list[str]]:
+    return run.called("parakeet-mlx") + whisper_calls(run)
+
+
+apple_silicon = pytest.mark.skipif(
+    not (platform.system() == "Darwin" and platform.machine() == "arm64"),
+    reason="Parakeet runs only on Apple Silicon",
+)
+elsewhere = pytest.mark.skipif(
+    platform.system() == "Darwin" and platform.machine() == "arm64",
+    reason="off Apple Silicon, Whisper is the only engine",
+)
+
+
 def reel(media: dict[str, Path], **extra: Any) -> dict[str, Any]:
     return {
         "yt-dlp": [{"json": REEL_INFO, "media": str(media["scenes"]), "thumbnail": str(media["thumb"])}],
+        "parakeet-mlx": [{"text": "Three ways to cook chickpeas."}],
         "mlx_whisper": [{"text": "Five things I would still do today.", "language": "en"}],
         "whisper-ctranslate2": [{"text": "Five things I would still do today.", "language": "en"}],
         **extra,
@@ -54,6 +69,7 @@ def test_reading_a_reel_gives_its_canonical_link_author_and_caption(
     assert Path(run.output["work"]).is_dir()
 
 
+@elsewhere
 def test_speech_without_captions_is_transcribed_by_whisper(
     post: Callable[..., Run], media: dict[str, Path]
 ) -> None:
@@ -62,6 +78,30 @@ def test_speech_without_captions_is_transcribed_by_whisper(
     assert run.output["transcript"] == "Five things I would still do today."
     assert run.output["transcript_source"] == "whisper"
     assert run.output["transcript_language"] == "en"
+
+
+@apple_silicon
+@pytest.mark.parametrize("hint", [None, "it", "en"])
+def test_on_apple_silicon_parakeet_transcribes_its_own_languages(
+    post: Callable[..., Run], media: dict[str, Path], hint: str | None
+) -> None:
+    args = ("read", REEL, "--language", hint) if hint else ("read", REEL)
+    run = post(*args, scenario=reel(media))
+
+    assert run.output["transcript"] == "Three ways to cook chickpeas."
+    assert run.output["transcript_source"] == "parakeet"
+    assert run.output["transcript_language"] == hint
+    assert whisper_calls(run) == []
+
+
+@apple_silicon
+def test_on_apple_silicon_whisper_takes_languages_parakeet_lacks(
+    post: Callable[..., Run], media: dict[str, Path]
+) -> None:
+    run = post("read", REEL, "--language", "ja", scenario=reel(media))
+
+    assert run.output["transcript_source"] == "whisper"
+    assert run.called("parakeet-mlx") == []
 
 
 def test_a_video_without_sound_has_no_transcript_and_skips_whisper(
@@ -74,7 +114,7 @@ def test_a_video_without_sound_has_no_transcript_and_skips_whisper(
 
     assert run.output["transcript"] is None
     assert run.output["transcript_source"] == "none"
-    assert whisper_calls(run) == []
+    assert speech_calls(run) == []
 
 
 VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -105,6 +145,7 @@ def youtube(media: dict[str, Path], **info: Any) -> dict[str, Any]:
             {"json": {**VIDEO_INFO, **info}, "media": str(media["scenes"]), "thumbnail": str(media["thumb"])},
             {"subs": VTT},
         ],
+        "parakeet-mlx": [{"text": "parakeet text"}],
         "mlx_whisper": [{"text": "whisper text", "language": "en"}],
         "whisper-ctranslate2": [{"text": "whisper text", "language": "en"}],
     }
@@ -118,7 +159,7 @@ def test_creator_captions_are_the_transcript_and_whisper_never_runs(
     assert run.output["transcript"] == "Soak the chickpeas overnight then roast them for twenty minutes"
     assert run.output["transcript_source"] == "captions"
     assert run.output["transcript_language"] == "en"
-    assert whisper_calls(run) == []
+    assert speech_calls(run) == []
 
 
 AUTO_VTT = """WEBVTT
@@ -144,7 +185,7 @@ def test_original_language_automatic_captions_come_before_whisper(
 
     assert run.output["transcript"] == "roast the chickpeas until crisp"
     assert run.output["transcript_source"] == "auto_captions"
-    assert whisper_calls(run) == []
+    assert speech_calls(run) == []
 
 
 def test_a_short_link_resolves_to_the_canonical_post_link(
@@ -340,7 +381,7 @@ def test_gallery_dl_login_challenge_needs_login(post: Callable[..., Run]) -> Non
 
 @pytest.mark.parametrize(
     ("missing", "named"),
-    [(("yt-dlp",), "yt-dlp"), (("mlx_whisper", "whisper-ctranslate2"), "whisper")],
+    [(("yt-dlp",), "yt-dlp"), (("parakeet-mlx", "mlx_whisper", "whisper-ctranslate2"), "is not installed")],
 )
 def test_a_missing_tool_is_an_error_that_names_it(
     post: Callable[..., Run], media: dict[str, Path], missing: tuple[str, ...], named: str
@@ -353,7 +394,8 @@ def test_a_missing_tool_is_an_error_that_names_it(
 
 def test_a_tool_that_fails_midway_is_an_error(post: Callable[..., Run], media: dict[str, Path]) -> None:
     scenario = reel(media)
-    scenario["mlx_whisper"] = scenario["whisper-ctranslate2"] = [{"exit": 1, "stderr": "Error: model load failed"}]
+    failing = [{"exit": 1, "stderr": "Error: model load failed"}]
+    scenario["parakeet-mlx"] = scenario["mlx_whisper"] = scenario["whisper-ctranslate2"] = failing
 
     run = post("read", REEL, scenario=scenario)
 
@@ -375,10 +417,12 @@ def test_check_asks_for_uv_which_installs_the_other_tools(post: Callable[..., Ru
     assert "astral.sh/uv" in missing["uv"]
 
 
-apple_silicon = pytest.mark.skipif(
-    not (platform.system() == "Darwin" and platform.machine() == "arm64"),
-    reason="the MLX Whisper model cache is only checked on Apple Silicon",
-)
+@apple_silicon
+def test_check_asks_for_parakeet_on_apple_silicon(post: Callable[..., Run]) -> None:
+    run = post("check", without=("parakeet-mlx",))
+
+    missing = {m["tool"]: m["install"] for m in run.output["missing"]}
+    assert missing["parakeet"] == "uv tool install parakeet-mlx"
 
 
 @apple_silicon
@@ -386,7 +430,7 @@ def test_check_says_whether_the_speech_model_is_downloaded(post: Callable[..., R
     hf_home = tmp_path / "hf"
     assert post("check", env={"HF_HOME": str(hf_home)}).output["speech_model"] == "not downloaded"
 
-    (hf_home / "hub" / "models--mlx-community--whisper-large-v3-turbo").mkdir(parents=True)
+    (hf_home / "hub" / "models--mlx-community--parakeet-tdt-0.6b-v3").mkdir(parents=True)
     assert post("check", env={"HF_HOME": str(hf_home)}).output["speech_model"] == "downloaded"
 
 
@@ -423,13 +467,13 @@ def test_clean_refuses_a_folder_that_read_did_not_make(post: Callable[..., Run],
     assert (precious / "notes.txt").exists()
 
 
-def test_a_language_hint_reaches_whisper(post: Callable[..., Run], media: dict[str, Path]) -> None:
-    run = post("read", REEL, "--language", "it", scenario=reel(media))
+def test_a_language_hint_parakeet_lacks_reaches_whisper(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    run = post("read", REEL, "--language", "ja", scenario=reel(media))
 
     calls = whisper_calls(run)
     assert len(calls) == 1
     argv = calls[0]
-    assert argv[argv.index("--language") + 1] == "it"
+    assert argv[argv.index("--language") + 1] == "ja"
 
 
 def test_the_link_can_arrive_on_stdin(post: Callable[..., Run], media: dict[str, Path]) -> None:

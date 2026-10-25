@@ -14,7 +14,7 @@ On my Mac, in the Claude Desktop Code tab, I say "run the Graveyard Killer worke
 
 - It reads the post anonymously, with no login and no cookies.
 - It resolves short links. If the result is a post that is already in the Library, it merges the two Entries.
-- It gets what the post says: the full caption, the speech (from the creator's captions or from Whisper) and the text on screen.
+- It gets what the post says: the full caption, the speech (from the creator's captions, or from speech-to-text) and the text on screen.
 - It finishes the Entry in my language. The Entry gets a real Title, Summary, Next action, Category and Tags, the transcript in its page body, and a thumbnail as its cover.
 - It sets the Status to Processed and deletes the downloaded media.
 
@@ -42,7 +42,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 7. As a non-technical user, I want the Worker to check its tools before it starts, so that a missing tool does not fail halfway through my Inbox.
 8. As a non-technical user, I want to be asked once before anything is installed, with what will be installed and roughly how big it is, so that nothing large lands on my computer by surprise.
 9. As a Library owner, I want the first transcription to warn me that the speech model is downloaded once, so that a slow first run does not look broken.
-10. As a Library owner, I want Apple Silicon Macs to use the fast Whisper build and other computers the portable one, so that transcription is as quick as my machine allows.
+10. As a Library owner, I want Apple Silicon Macs to use Parakeet, with Whisper for languages Parakeet lacks, and other computers the portable Whisper, so that transcription is quick and does not invent words over music.
 
 ### Reading the post
 
@@ -114,11 +114,11 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 
 - **The tools:**
   - yt-dlp and gallery-dl, as uv tools.
-  - mlx-whisper on Apple Silicon, or whisper-ctranslate2 (built on faster-whisper) elsewhere, as uv tools.
+  - On Apple Silicon: parakeet-mlx (Parakeet-TDT v3) and mlx-whisper, as uv tools. Elsewhere: whisper-ctranslate2 (built on faster-whisper).
   - ffmpeg from the system package manager.
 - **Checking them:** the post script has a `check` command. It lists what is missing, uv included, with the install command for this platform. It also says whether the speech model is downloaded yet, so the agent can warn before the first transcription.
 - **Asking first:** the agent asks once before installing anything. It names each tool and says the speech model downloads on first use, about 1.6 GB for the turbo model.
-- **The speech model** is Whisper turbo (large-v3-turbo) on both builds.
+- **The speech engine** is Parakeet-TDT v3 on Apple Silicon when the post's language is unknown or one of its 25 European languages, and Whisper turbo (large-v3-turbo) for any other language. Off Apple Silicon it is Whisper turbo alone. The language comes from the agent's hint or the platform's own metadata. Parakeet was chosen on 2026-10-25: the user's video-making work found it 5 to 10 times faster than Whisper with a lower error rate, and a Whisper warm-up on a 2-second tone with no speech wrote "Thank you."
 
 ### The post script
 
@@ -135,7 +135,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - `id`, `author`, `title`, `caption`
   - `kind`: `video` or `photos`
   - `duration`
-  - `transcript`, plus `transcript_source` (`captions`, `auto_captions`, `whisper` or `none`) and `transcript_language`
+  - `transcript`, plus `transcript_source` (`captions`, `auto_captions`, `parakeet`, `whisper` or `none`) and `transcript_language`
   - `work`: the work folder, for `clean`
   - `keyframes`: image paths
   - `thumbnail`: a JPEG path, kept under 5 MiB for Notion's Free plan
@@ -145,7 +145,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - The output keeps the yt-dlp metadata and gallery-dl's images.
 - **Transcript:**
   - The creator's captions are used when they exist, in the video's own language. Otherwise the original-language automatic captions are used (see the borrowed caption choice below).
-  - Otherwise Whisper runs on the audio, if there is audio.
+  - Otherwise speech-to-text runs on the audio, if there is audio: Parakeet or Whisper, as above.
   - Photos get no transcript.
 - **Keyframes:**
   - For video: the first frame, plus scene-change frames, at most 8 in total, each scaled to at most 1024 px.
@@ -165,7 +165,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 - **Downloads:** each run gets a fresh work folder. A partial download or a leftover merge file never counts as media. Both tools ignore the user's own config files, so no cookies or login stored there are used.
 - **Clean-up:** delete only the work folder that this run created, never its parent.
 - **On an HTTP 403 from yt-dlp:** update yt-dlp once (`uv tool upgrade yt-dlp`) and retry once before reporting the status. A login challenge is never retried, because ADR 0001 says to stop reading Instagram at the first challenge. Rotating clients or cookies is ruled out.
-- **Non-English speech:** pass a spoken-language hint to Whisper when the Entry's Caption is clearly in one language. The Settings language is the user's, not the video's, so it is never the hint. Otherwise Whisper detects the language itself. (claude-video's "unverified" label was for a WhisperX bug that turbo does not have.)
+- **Non-English speech:** pass the spoken language as a hint when the Entry's Caption is clearly in one language. It picks the engine, and Whisper also takes it as its language. The Settings language is the user's, not the video's, so it is never the hint. Otherwise Whisper detects the language itself. (claude-video's "unverified" label was for a WhisperX bug that turbo does not have.)
 
 ### The run (the agent's steps)
 
@@ -227,9 +227,9 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
     - No work folder is left on disk after the run.
 - **Seam 2, the post script.**
   - It is built test first with pytest, and the tests call the script as the agent does.
-  - Fake `yt-dlp`, `gallery-dl`, Whisper and `uv` commands are placed first on PATH. They print stored JSON and copy small media files. Real `ffmpeg` and `ffprobe` run on short clips and images that the tests build, so the keyframe and thumbnail checks test real behaviour. No test needs the network. Without ffmpeg on the computer, the media tests skip.
+  - Fake `yt-dlp`, `gallery-dl`, Parakeet, Whisper and `uv` commands are placed first on PATH. They print stored JSON and copy small media files. Real `ffmpeg` and `ffprobe` run on short clips and images that the tests build, so the keyframe and thumbnail checks test real behaviour. No test needs the network. Without ffmpeg on the computer, the media tests skip.
   - The cases:
-    - a video post with speech gives a Whisper transcript;
+    - a video post with speech gives a Parakeet transcript on Apple Silicon, for an unknown language or one of Parakeet's, and a Whisper transcript for any other language or elsewhere;
     - a YouTube video with creator captions gives `transcript_source: captions`, and Whisper is never called;
     - with no creator captions, the original-language automatic captions give `auto_captions`;
     - a short link's resolved `webpage_url` gives a canonical `link`;
@@ -275,7 +275,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - Moving an Entry to the trash works through the connector.
   - gallery-dl reads Instagram carousels and photo posts anonymously. If it needs a login, those posts get `needs_login`.
   - yt-dlp or gallery-dl reads TikTok photo posts.
-  - Whisper turbo handles Italian speech well enough for Summaries.
+  - Parakeet handles Italian speech, and speech over music, well enough for Summaries.
   - A 14-minute video transcribes in reasonable time on Apple Silicon.
 - **Why claude-video is not a dependency** (checked 2026-10-24):
   - It is a second plugin for every user to install.

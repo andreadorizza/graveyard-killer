@@ -8,7 +8,7 @@ You have chosen the Worker run, found the Library and read its Settings (see SKI
 
 1. **Check the tools.** Run `python3 scripts/post.py check`. Done when it prints `"ok": true`.
    - If tools are missing, tell the user which ones, using the `install` commands it prints. Ask once. On a yes, run each install command in the order given, then run `check` again. On a no, stop.
-   - If `speech_model` is `"not downloaded"`, tell the user that the first video downloads the speech model once, about 1.6 GB, so it takes longer.
+   - If `speech_model` is `"not downloaded"`, tell the user that the first video downloads the speech model once, over 1 GB, so it takes longer.
 
 2. **List the Inbox.** Query the Entries whose Status is the Library's label for Inbox, oldest Captured first. Done when you hold the list.
    - If it is empty, tell the user there is nothing to process, and stop.
@@ -37,7 +37,7 @@ An article or any other page has no media to read. If its Summary is empty, read
    LINK
    ```
 
-   When the Entry's Caption is clearly in one language, add a spoken-language hint, such as `read --language it <<'LINK'`, so that Whisper hears it right. Done when the script has printed one JSON object. Keep its `work` path for step 4.
+   When the Entry's Caption is clearly in one language, add its language code as a hint, such as `read --language it <<'LINK'`, so that the right speech engine runs. Done when the script has printed one JSON object. Keep its `work` path for step 4.
 
 3. **Act on its `status`.** Done when the Entry has its result:
    - `ok`: if its `link` differs from the Entry's Link, [merge a duplicate](#merge-a-duplicate) first. Otherwise, [finish the Entry](#finish-the-entry).

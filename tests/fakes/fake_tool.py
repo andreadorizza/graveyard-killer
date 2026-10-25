@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stand-in for yt-dlp, gallery-dl, Whisper and uv in the post script's tests.
+"""Stand-in for yt-dlp, gallery-dl, Parakeet, Whisper and uv in the post script's tests.
 
 The tool is named by the file it runs as. Each call appends its argv to the
 log in $GK_FAKE_LOG and plays the next response for that tool from the
@@ -9,7 +9,7 @@ scenario in $GK_FAKE_SCENARIO:
 
 A response may hold: exit, stderr, json (printed; a string is printed as is),
 media and thumbnail (files copied to where yt-dlp would write them), subs
-(a VTT text), images and metadata (gallery-dl), text and language (Whisper).
+(a VTT text), images and metadata (gallery-dl), text and language (Parakeet and Whisper).
 """
 
 from __future__ import annotations
@@ -74,9 +74,13 @@ elif tool == "gallery-dl":
         if "--write-metadata" in argv:
             Path(f"{image_file}.json").write_text(json.dumps(response.get("metadata", {})))
 
-elif tool in ("mlx_whisper", "whisper-ctranslate2"):
+elif tool in ("mlx_whisper", "whisper-ctranslate2", "parakeet-mlx"):
     out_dir = Path(option("--output-dir") or option("--output_dir") or ".")
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = Path(argv[0]).stem
-    result = {"text": response.get("text", ""), "language": response.get("language", "en"), "segments": []}
+    result: dict[str, Any] = {"text": response.get("text", "")}
+    if tool != "parakeet-mlx":  # Parakeet's JSON names no language; Whisper's does
+        result.update(language=response.get("language", "en"), segments=[])
+    else:
+        result.update(sentences=[])
     (out_dir / f"{stem}.json").write_text(json.dumps(result))

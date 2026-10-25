@@ -14,7 +14,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
 1. **Capture, on the phone.** You share a link to the agent app. For TikTok, YouTube and other links, the agent reads a preview from public pages, then files an Entry in the Inbox with a first Category, summary and Next action. For Instagram it files the link only, because Instagram refuses agent fetches and its embed page no longer carries the caption. The Worker fills in the rest. The same link twice stays one Entry, and the second capture is noted.
 2. **Worker run, weekly.**
    - Download: yt-dlp for video, gallery-dl for photos and carousels.
-   - Extract: Whisper for speech (mlx-whisper on Apple Silicon, faster-whisper elsewhere), or YouTube's own captions when present. The agent reads on-screen text from keyframes.
+   - Extract: YouTube's own captions when present. Otherwise speech-to-text: Parakeet-TDT v3 on Apple Silicon, which covers 25 European languages and makes up far less over music, with Whisper turbo for other languages. Whisper turbo alone elsewhere. The agent reads on-screen text from keyframes.
    - Finish the Entry: the agent's analysis, a stored thumbnail (none in Sheets), then the media is deleted (a setting keeps it).
    - Dig up the run's quota of Buried Entries, newest first.
    - Last step: write the "Week of …" Digest.
@@ -49,7 +49,7 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 2. Pick the Library; the agent creates it with its Settings.
 3. Pick the weekly day.
 4. Pick the browser you are logged in with.
-5. The agent installs the tools, asking first: uv, ffmpeg, yt-dlp, gallery-dl, Whisper.
+5. The agent installs the tools, asking first: uv, ffmpeg, yt-dlp, gallery-dl, Parakeet (on Apple Silicon) and Whisper.
 6. Test one link end to end, and approve the Library tools with "always allow" so scheduled runs never stall.
 7. The agent saves the Library link to memory and creates the weekly task.
 8. On the phone: connect Notion or Sheets, and share a test link.
