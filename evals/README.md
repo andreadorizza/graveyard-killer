@@ -29,7 +29,7 @@ These evals cannot cover what only the phone shows: whether the skill loads in t
 
 ## Worker (`worker.json`)
 
-These evals also run in Claude Code on the Mac, with the memory line in place, against the same test Library. Every prompt is "process my inbox". What differs is the Library's state before the run, which each eval's `expected_output` describes as its seed. Seed the Entries by sharing from the phone, or write them into the Entries database by hand, then run the eval.
+These evals also run in Claude Code on the Mac, with the memory line in place, against the same test Library. Every prompt is "run the Graveyard Killer worker". What differs is the Library's state before the run, which each eval's `expected_output` describes as its seed. Seed the Entries by sharing from the phone, or write them into the Entries database by hand, then run the eval.
 
 The Worker downloads and transcribes, so the tools from `post.py check` must be installed first.
 

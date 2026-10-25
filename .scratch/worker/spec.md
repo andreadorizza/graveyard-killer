@@ -10,7 +10,7 @@ The only machine that can read the posts is my own computer. It has a home conne
 
 ## Solution
 
-On my Mac, in the Claude Desktop Code tab, I say "process my inbox". The Worker goes through every Entry with Status Inbox, oldest first. For each one, it does the following:
+On my Mac, in the Claude Desktop Code tab, I say "run the Graveyard Killer worker". The Worker goes through every Entry with Status Inbox, oldest first. For each one, it does the following:
 
 - It reads the post anonymously, with no login and no cookies.
 - It resolves short links. If the result is a post that is already in the Library, it merges the two Entries.
@@ -30,12 +30,12 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 
 ### Starting a run
 
-1. As a Library owner, I want to say "process my inbox" in the Code tab, so that my thin Entries get finished without me opening each post.
+1. As a Library owner, I want to say "run the Graveyard Killer worker" in the Code tab, so that my thin Entries get finished without me opening each post.
 2. As a Library owner, I want the Worker to find my Library and read its Settings the same way Capture does, so that it writes the same field names, Status labels and Categories.
 3. As a Library owner, I want the Worker to take only Entries with Status Inbox, so that it never touches Entries I have Used or Dismissed.
 4. As a Library owner, I want the oldest Entries done first, so that nothing waits forever behind new Captures.
 5. As a Library owner, I want a clear message when the Library has no Inbox Entries, so that I know the run did nothing on purpose.
-6. As a phone user, I want "process my inbox" sent from the phone answered with "the Worker runs on your computer", so that I know where to ask.
+6. As a phone user, I want "run the Graveyard Killer worker" sent from the phone answered with "the Worker runs on your computer", so that I know where to ask.
 
 ### Tools
 
@@ -105,7 +105,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 ### Skill
 
 - **A new job.** SKILL.md gets a second job, **Worker run**, with its own reference file.
-  - **Trigger:** the description gains one branch: the user asks to process their Inbox.
+  - **Trigger:** the description gains one branch: the user names Graveyard Killer, for example to run its Worker. A bare "process my inbox" is ambiguous (it may mean email), so the request must name Graveyard Killer.
   - **Shared steps:** the job reuses "Find the Library" and "Read the Settings" as they are.
   - **Shell check:** the job needs a computer with a shell. On a surface without one, such as the phone app, the agent says that the Worker runs on the computer and stops.
 - **Agent and script split the work.** The agent does the Notion reads and writes, the duplicate checks and all the writing and judging (Title, Summary, Next action, Category, Tags, reading keyframes). The post script does everything that touches media. The agent never runs yt-dlp, gallery-dl, ffmpeg or Whisper directly.
@@ -221,7 +221,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
     - The YouTube Entry keeps its Title and gains the description in Caption and a transcript.
     - A second short link for an already-processed TikTok is merged: the older Entry gains a "Captured again" line, and the newer one is in the trash.
     - A non-existent YouTube video ends Unavailable, with a Note.
-    - "Process my inbox" with no Inbox Entries reports that there is nothing to do.
+    - "Run the Graveyard Killer worker" with no Inbox Entries reports that there is nothing to do.
     - An Entry with a Category set by hand keeps it.
     - An article Entry (Platform Other) with an empty Summary ends Processed, with no post read.
     - No work folder is left on disk after the run.

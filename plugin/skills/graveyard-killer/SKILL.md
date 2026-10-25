@@ -1,6 +1,6 @@
 ---
 name: graveyard-killer
-description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use when the user names Graveyard Killer or asks to process their inbox.
+description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use whenever the user names Graveyard Killer, for example to run its Worker on the Inbox.
 ---
 
 # Graveyard Killer
@@ -13,7 +13,7 @@ Talk to the user in the language set in their Library's **Settings**. Keep this 
 
 A **Capture** is the user sending you one post's URL to keep it. It arrives as a link on its own, a link inside an app's share text ("Check out this reel!"), or a link with a short "save this". The user is usually on their phone and wants to send the next post in seconds. So finish a Capture in one turn and ask nothing.
 
-A **Worker run** is the user asking you to process their Inbox ("process my inbox"). It downloads and reads each post on the user's computer, so it needs a shell with the user's own tools. If you have no shell, as in a phone app, tell the user the Worker runs on their computer, in the Claude Desktop Code tab, and stop.
+A **Worker run** is the user asking Graveyard Killer to finish its Inbox, for example "run the Graveyard Killer worker". The request names Graveyard Killer. An inbox request without that name is about something else, such as email, so answer it as usual. It downloads and reads each post on the user's computer, so it needs a shell with the user's own tools. If you have no shell, as in a phone app, tell the user the Worker runs on their computer, in the Claude Desktop Code tab, and stop.
 
 A link that comes with a question or a task ("summarise this", "is this true?") is a request, and a message with no link is ordinary chat. Answer those as usual, without this skill.
 

@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: the Instagram reel Entry from a phone Capture (link only, fallback Category, Note set). It ends Processed with the post's content.",
       "files": [],
       "expectations": [
@@ -18,7 +18,7 @@
     },
     {
       "id": 2,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: the TikTok Entry captured from a vm.tiktok.com short link. Its Link becomes the full post link, and it ends Processed.",
       "files": [],
       "expectations": [
@@ -29,7 +29,7 @@
     },
     {
       "id": 3,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: the YouTube Entry Capture already previewed. The Worker keeps its Title and adds the description and a transcript.",
       "files": [],
       "expectations": [
@@ -41,7 +41,7 @@
     },
     {
       "id": 4,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: a Processed TikTok Entry, and a newer Inbox Entry holding a different vm.tiktok.com short link to the same video. The newer one is merged into the older one.",
       "files": [],
       "expectations": [
@@ -52,7 +52,7 @@
     },
     {
       "id": 5,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: an Inbox Entry for https://www.youtube.com/watch?v=aaaaaaaaaaa, a video that does not exist. It ends Unavailable.",
       "files": [],
       "expectations": [
@@ -63,7 +63,7 @@
     },
     {
       "id": 6,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: no Entry has Status Inbox. The Worker reports that there is nothing to do.",
       "files": [],
       "expectations": [
@@ -73,7 +73,7 @@
     },
     {
       "id": 7,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: an Inbox Entry whose Category the user set by hand to a non-fallback Category. The Worker keeps it.",
       "files": [],
       "expectations": [
@@ -83,7 +83,7 @@
     },
     {
       "id": 8,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "Seed: an Inbox Entry with Platform Other for an article, with an empty Summary and a Note. It ends Processed.",
       "files": [],
       "expectations": [
@@ -94,11 +94,21 @@
     },
     {
       "id": 9,
-      "prompt": "process my inbox",
+      "prompt": "run the Graveyard Killer worker",
       "expected_output": "After any of the runs above, no work folder is left on disk.",
       "files": [],
       "expectations": [
         "No folder named graveyard-killer-* remains in the system temp folder after the run"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "process my inbox",
+      "expected_output": "Ambiguous: the request does not name Graveyard Killer, so the skill does not run and no Entry changes.",
+      "files": [],
+      "expectations": [
+        "The graveyard-killer skill does not start a Worker run",
+        "No Entry is created, changed or moved to the trash"
       ]
     }
   ]
