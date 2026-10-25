@@ -12,7 +12,7 @@
         "Its page body has a Transcript section, and an On-screen text section if the video shows text",
         "Its Title is no longer the link or Capture's '<Platform> post' title",
         "Its Category is a non-fallback Category when one fits the post",
-        "It has a page cover",
+        "It has no cover, since Instagram has no stable image link",
         "The reply is in the Settings language and counts it as Processed"
       ]
     },
@@ -36,18 +36,20 @@
         "The YouTube Entry keeps the Title Capture wrote",
         "Its Caption holds the video's description",
         "Its page body has a Transcript section",
-        "Its Status is the Library's label for Processed"
+        "Its Status is the Library's label for Processed",
+        "It has a cover whose external link is on i.ytimg.com"
       ]
     },
     {
       "id": 4,
       "prompt": "run the Graveyard Killer worker",
-      "expected_output": "Seed: a Processed TikTok Entry, and a newer Inbox Entry holding a different vm.tiktok.com short link to the same video. The newer one is merged into the older one.",
+      "expected_output": "Seed: a Processed TikTok Entry, and a newer Inbox Entry holding a different vm.tiktok.com short link to the same video. The newer one is marked as a duplicate, and the agent asks before trashing it.",
       "files": [],
       "expectations": [
-        "The newer Entry is in the Notion trash",
         "The older Entry's page body gains a 'Captured again on <date>' line with the newer Entry's Captured date",
-        "The reply counts one merged Entry"
+        "The newer Entry's Note says it duplicates the older Entry",
+        "The closing reply lists the duplicate and asks once whether to move it to the trash",
+        "After a yes, the newer Entry is in the Notion trash"
       ]
     },
     {

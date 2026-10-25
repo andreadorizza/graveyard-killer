@@ -139,6 +139,8 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - `work`: the work folder, for `clean`
   - `keyframes`: image paths
   - `thumbnail`: a JPEG path, kept under 5 MiB for Notion's Free plan
+  - `cover_url`: a cover image link that will not expire (YouTube's `i.ytimg.com`), or null
+  - `transcript_blocks`: the transcript split between sentences into pieces of at most 1,800 characters, for Notion's 2,000-character blocks
 - **Reading a post:**
   - yt-dlp runs first, anonymously, with video at most 720p.
   - If yt-dlp reports a post with no video (an Instagram photo post or carousel, or a TikTok photo post), the script falls back to gallery-dl, also anonymously.
@@ -177,7 +179,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
    - `unavailable`: set Status Unavailable and set the Note to the reason. Change nothing else.
    - `error`: leave the Entry in the Inbox, set the Note to the reason, and go on.
    - `ok` with a `link` different from the Entry's Link: query for an Entry with the new link.
-     - If one exists, add "Captured again on <this Entry's Captured date>" to the older Entry's page body, move this Entry to the trash, clean the work folder, and go on.
+     - If one exists, add "Captured again on <this Entry's Captured date>" to the older Entry's page body, set this Entry's Note to "Duplicate of <older Entry>", clean the work folder, and go on. At the end of the run, the agent lists the duplicates and asks once whether to move them to the trash, because Notion's connector trashes a page only on the user's say-so.
      - If none exists, update the Link.
    - `ok`: finish the Entry, as described in [Finishing an Entry](#finishing-an-entry).
 4. **Clean up** the work folder with `clean` after each Entry, whatever its result.
@@ -197,7 +199,7 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
   - **Category fields:** filled only when the post states the value and the field is empty.
   - **Author and Caption:** set from the post. A caption too long for its field overflows into the page body, as in the Library contract.
 - **Page body:** the agent adds a Transcript section and an On-screen text section, with headings in the Settings language. It leaves out any section that would be empty.
-- **Cover:** the agent uploads the thumbnail through the Notion connector's file upload and sets it as the page cover. A connector with no file upload means no cover, and that is not a failed write.
+- **Cover:** the agent sets `cover_url` as the page cover's external link when it is not null. Notion's connector cannot set an uploaded file as a cover (2026-10-25), and only YouTube has a cover link that does not expire.
 - **Last step:** the agent sets Status Processed and clears the Note. Status Processed is written only after every write above has succeeded.
 
 ### Library contract changes
@@ -265,6 +267,14 @@ This slice proves the Worker's hardest parts by hand: downloading, transcription
 
 ## Further Notes
 
+- **First Worker run, 2026-10-25.** A fresh agent followed only the skill's files on the test Library's 3 Entries. All 3 ended Processed in about 16 minutes. Parakeet transcribed all three, and the TikTok short link resolved. The run led to these changes:
+  - covers come from `cover_url` (YouTube only);
+  - duplicates go to the trash only after the user agrees at the end of the run;
+  - the transcript comes pre-split in `transcript_blocks`;
+  - library.md now explains how to add a Tag option without deleting the others, escapes Markdown in text from the post, and sets the 2,000-character caption limit;
+  - the title rule also replaces a bare link, and Capture's no-preview title in any language;
+  - on-screen text leaves out burned-in subtitles;
+  - Entries with the same Captured date are ordered by page creation.
 - **Checked 2026-10-24**, with yt-dlp 2026.10.21, metadata only, no cookies, from this Mac:
   - The test Instagram reel gave its author, its full caption and 8 formats.
   - The test TikTok short link resolved to `@chase_ai_/video/7693602525081111821`, with its author and caption.
