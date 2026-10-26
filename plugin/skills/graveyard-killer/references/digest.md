@@ -1,34 +1,44 @@
 # Digest
 
-A **Digest** is a short weekly review of the Library, written for the user. It is a child page of the Library, titled "Week of <date>" in the Settings language, so the user can read it on the phone. Each Worker run writes one as its last step. The user can also ask for a Digest in any chat.
+A **Digest** is a short weekly review of the Library, written for the user. It is a child page of the Library, titled `Digest YYYY-MM-DD` with the day it was written, so the user can read it on the phone and every agent can find the newest one. Each Worker run writes one as its last step. The user can also ask for a Digest in any chat.
 
 You have chosen this job, found the Library and read its Settings (see SKILL.md).
 
 ## Write the Digest
 
-This is the last step of every Worker run, and the job when the user asks for a new one.
+This is the last step of every Worker run. A "Show a Digest" request can also lead here.
 
-1. **Gather the week.** These are the Entries processed since the last Digest page, or in the last 7 days when there is none. Done when you hold these lists:
-   - **New:** Entries Processed in the period, grouped by Category, each with its Title, its Next action and a link to the Entry;
-   - **Dug up:** the Buried Entries this run dug up, also with their Next action;
-   - **Needs you:** Entries still in the Inbox or Buried with a Note, and duplicates waiting for the user's yes;
-   - **Re-import:** only when "Last import" in the Settings' Graveyard section is more than 3 months ago, or empty while Buried Entries exist. Remind the user to export their Graveyard again and import it.
+1. **Find the period.** It starts at the date of the newest Digest page in the Library (its title says it), or 7 days ago when there is none. It ends today. Done when you hold both dates.
 
-2. **Create the page** under the Library page. Title it "Week of <today's date>" in the Settings language. Write a section for each list that is not empty, with headings in the Settings language, in the order above. Keep it short: one line per Entry. Done when the page exists.
+2. **Gather the lists.** Done when you hold all four:
+   - **New:** Entries whose Processed date is in the period and whose Status is not Dismissed, grouped by Category;
+   - **Dug up:** among them, the Entries that came from the Graveyard (they have a Saved date);
+   - **Needs you:** every Entry in the Inbox, every Buried Entry with a Note, and every Entry whose Note says it is a duplicate;
+   - **Re-import:** a reminder to export the Graveyard again and import it, only when "Last import" in the Settings' Graveyard section is more than 3 months ago, or empty while Buried Entries exist.
 
-3. **Tell the user** that the Digest is ready, with a link to it, and add it to the run's closing summary. Done when you have sent it.
+   If all four are empty, write no page. Say there is nothing new this week, and stop.
+
+3. **Create the page** under the Library page, titled `Digest <today as YYYY-MM-DD>`. Done when the page exists. Its layout:
+   - one level-2 heading for each list that is not empty, in the order above. Translate "New", "Dug up", "Needs you" and "Re-import" into the Settings language once, and use the same words as the previous Digest;
+   - under New, one level-3 heading per Category;
+   - one line per Entry: a mention of the Entry's page, then " — " and its Next action. Under Needs you, put its Note instead.
+
+4. **Report it.** In a Worker run, add the Digest's link to the run's closing summary. Done when the link is in it.
 
 ## Show a Digest
 
 The user asks to see their Digest, in any chat, for example "show my Graveyard Killer digest".
 
-1. **Open the newest Digest page** in the Library, or write one first if there is none from the last 7 days. Done when you hold its content.
-2. **Show it** in a few lines, with the link to the page. Done when you have sent it.
-3. **Offer Proposals.** A **Proposal** is an action you offer while showing the Digest. Nothing happens unless the user accepts it. Offer at most 3, each in one line, such as:
-   - mark an Entry Used when the user says they did its Next action;
-   - move an Entry in the fallback Category to a better one;
-   - move the duplicates to the Notion trash;
-   - dig up a Category next (it sets "Dig up next");
-   - an Amnesty, when many Buried Entries are older than a year.
+1. **Find the newest Digest page** by its title. If there is none from the last 7 days, write one first ([Write the Digest](#write-the-digest), steps 1 to 3). Done when you hold its content, or know there is nothing new.
+2. **Show it** in a few lines, in the Settings language, with the link to the page. Done when you have sent it.
+3. **Offer Proposals.** A **Proposal** is an action you offer while showing the Digest. Nothing happens unless the user accepts it. Offer at most 3, one line each. Done when you have offered them.
 
-   Done when you have offered them. Act on a Proposal only after the user's yes, and then follow the job it belongs to.
+## Proposals
+
+Act on a Proposal only after the user says yes. Each one, and what to do on a yes:
+
+- **Mark an Entry Used,** when the user says they did its Next action: set its Status to the Library's label for Used.
+- **Dismiss an Entry** the user no longer wants: set its Status to the Library's label for Dismissed. It stays in the Library.
+- **Move an Entry to another Category,** when it sits in the fallback Category and another fits: set its Category. When no Category fits a group of Entries, offer a new Category. On a yes, add it to the Settings' Categories table and to the Category property's options, as [library.md](library.md#writing-to-notion) explains for options. Then move the Entries.
+- **Move the duplicates to the trash:** the Entries whose Note says they are duplicates. Your Notion connector trashes a page only on the user's say-so, and this yes is it.
+- **Dig up a Category next,** or **an Amnesty** when many Buried Entries are older than a year: follow [graveyard.md](graveyard.md).

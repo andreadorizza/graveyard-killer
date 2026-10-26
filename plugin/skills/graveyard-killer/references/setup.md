@@ -2,26 +2,26 @@
 
 Setup is a conversation on the user's computer, in the Claude Desktop Code tab, after the plugin is added. At the end the user has their own Library, the tools, the weekly Worker and Capture on the phone. The user is probably not technical, so do the work yourself. Explain each step in a line, and ask one thing at a time.
 
-Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard Killer job finds no Library. It does not need an existing Library, so skip SKILL.md's steps 2 and 3. Talk in the user's language. It becomes the Settings language.
+Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard Killer job finds no Library. It does not need an existing Library, so skip SKILL.md's steps 2 and 3. Talk in the language the user writes in. It becomes the Settings language: say so in your first question, so the user can pick another.
 
 ## Steps
 
-1. **What do they save?** Ask what kinds of posts the user saves, such as recipes, places, workouts or AI prompts. If their Instagram export is already on the computer, run `python3 scripts/graveyard.py "<path>"` and offer its `collections` as Categories. Done when you have 2 to 8 Categories, each with a line on what goes in it, and maybe its own fields (a recipe's ingredients, a place's location). Add one fallback Category for everything else.
+1. **What do they save?** Ask what kinds of posts the user saves, such as recipes, places, workouts or AI prompts. If the user mentions an Instagram export already on the computer, run `python3 scripts/graveyard.py "<path>"` and offer its `collections` as Categories. Done when you have 2 to 8 Categories, each with a line on what goes in it, and maybe its own fields (a recipe's ingredients, a place's location). Add one fallback Category for everything else.
 
-2. **Create the Library.** Check that your Notion connector works. If it does not, ask the user to connect Notion first. Then create the Library exactly as [library.md](library.md) describes:
-   - a private Notion page titled "Graveyard Killer", or the user's own name for it;
+2. **Create the Library.** Check that your Notion connector works, for example by reading the user's Notion profile or searching. If it does not, ask the user to connect Notion first. Ask in one question what to call the Library, suggesting "Graveyard Killer" as a private page. Then create it exactly as [library.md](library.md) describes:
+   - the private page with that name;
    - the Entries database inside it, with every field in the user's language, the six Statuses and the Category options;
-   - the `Settings` page, with every section.
+   - the `Settings` page, with every section. The Schedule section stays empty until step 3. The Graveyard section starts with "Dig up per run" at 10.
 
-   Ask where the page should live only if the user cares. Done when you can read the Settings back.
+   Done when you can read the Settings back.
 
 3. **Pick the schedule.** Ask which weekday and time the weekly Worker should run. Suggest Sunday at 10:00, and say that it runs only while the Claude app is open and the computer is awake. Write the answer in the Settings' Schedule section. Done when the Settings hold it.
 
 4. **Install the tools.** Follow step 1 of [worker.md](worker.md#steps). Done when `check` prints `"ok": true`.
 
-5. **Test one link end to end.** Ask the user for the link of a public post they saved. Capture it as [capture.md](capture.md) says, then run the Worker on it as [worker.md](worker.md) says. Show them the finished Entry. Done when it is Processed.
+5. **Test one link end to end.** Ask the user for the link of a public post they saved. Capture it as [capture.md](capture.md) says. Then finish only that Entry, as worker.md's [Each Entry](worker.md#each-entry) says, with no dig-up and no Digest. Show them the finished Entry. Done when it is Processed.
 
-6. **Remember the Library.** Save `Graveyard Killer Library: <link>` to your memory. Without a memory tool, ask the user to add the line to their Claude Code memory. Done when the line is saved.
+6. **Remember the Library.** In the Code tab, memory is the user's Claude Code memory file, `~/.claude/CLAUDE.md`. Show the user the line `Graveyard Killer Library: <link>`, with the link and no query string. With their OK, add it at the end of that file. Use no other memory, such as Notion's. Done when the line is saved.
 
 7. **Schedule the Worker,** as [schedule.md](schedule.md) says. Done when the weekly task exists.
 

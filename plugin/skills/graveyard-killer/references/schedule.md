@@ -8,9 +8,16 @@ You have chosen this job, found the Library and read its Settings (see SKILL.md)
 
 1. **Read the schedule** from the Settings' Schedule section: a weekday and a time, such as `Domenica 10:00`. Done when you hold both. With no time given, use 10:00.
 
-2. **Create or update the task.** List the scheduled tasks first. If one named `graveyard-killer-worker` exists, update it. Otherwise create it with:
+2. **Create or update the task.** List the scheduled tasks first, and read the prompt of any task named `graveyard-killer-worker`.
+   - If its prompt names this Library, update its schedule and prompt.
+   - If it names another Library, it runs that Library's Worker. Ask the user whether to replace it or add a second task. A second task gets the taskId `graveyard-killer-worker-2`, or the next free number.
+   - If there is none, create it.
+
+   Use these values:
    - **taskId:** `graveyard-killer-worker`
    - **title:** "Graveyard Killer: weekly Worker", in the Settings language
+   - **description:** "Weekly Graveyard Killer Worker run: finishes the Inbox, digs up the Graveyard and writes the Digest"
+   - **notifications:** off, since the Digest tells the user what happened
    - **schedule:** a weekly cron expression in local time, such as `0 10 * * 0` for Sunday at 10:00 (0 is Sunday, 1 is Monday)
    - **prompt:** exactly this, with the Library link filled in:
 

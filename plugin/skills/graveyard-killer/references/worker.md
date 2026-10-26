@@ -33,7 +33,7 @@ You have chosen the Worker run, found the Library and read its Settings (see SKI
 
 ### Platform Other
 
-An article or any other page has no media to read. If its Summary is empty, read the page with your web fetch tool and write the fields as in [Finish the Entry](#finish-the-entry). Then set Status Processed and clear the Note. Done when the Entry is Processed.
+An article or any other page has no media to read. If its Summary is empty, read the page with your web fetch tool and write the fields as in [Finish the Entry](#finish-the-entry). Then set Status Processed, set Processed to today, and clear the Note. Done when the Entry is Processed.
 
 ### Instagram, TikTok and YouTube
 
@@ -84,8 +84,8 @@ Read the `caption` and the `transcript`. Look at every image in `keyframes` with
 - one Next action that starts with a verb: what the user could do with the post's content (try, cook, read, visit). A creator's "comment X to get Y" is a Next action only when it is the only way to the content;
 - a Category, if the rules let you replace it, and the empty Category fields whose values the post states;
 - Tags, at most 5 on the Entry;
-- Author and Caption from `author` and `caption`;
-- in the page body, a Transcript section with one paragraph per item in `transcript_blocks`, and an On-screen text section with what the keyframes show, leaving out a section that would be empty. When the video has no speech, only music, the transcript is song lyrics or noise: leave the Transcript section out and say in the Summary that the video has only music;
+- Author and Caption from `author` and `caption`, with the long-text and song-lyrics rules from [library.md](library.md#writing-to-notion);
+- in the page body, a Transcript section with one paragraph per item in `transcript_blocks`, and an On-screen text section with what the keyframes show, leaving out a section that would be empty. When the video has no speech, only music or singing, the transcript is song lyrics or noise: leave the Transcript section out and say in the Summary that the video has only music;
 - the page cover, when `cover_url` is not null: set it as the cover's external link. With no `cover_url`, the Entry has no cover.
 
-Write page content in the form your Notion connector asks for. Done when every write has succeeded. Then set Status to the Library's label for Processed and clear the Note. If any write failed, leave the Entry in the Inbox and set the Note to what failed.
+Write page content in the form your Notion connector asks for. Done when every write has succeeded. Then set Status to the Library's label for Processed, set Processed to today, and clear the Note. If any write failed, leave the Entry in the Inbox and set the Note to what failed.

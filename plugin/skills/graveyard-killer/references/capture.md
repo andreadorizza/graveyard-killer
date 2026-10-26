@@ -50,7 +50,7 @@ You have chosen Capture, found the Library and read its Settings (see SKILL.md).
 5. **Create the Entry** in the Entries database. Use the Library's field names and its label for Status Inbox, and write text as [library.md](library.md#writing-to-notion) explains. Done when the connector confirms the new Entry. Its fields are:
    - Title, Summary, Next action, Category, Category fields and Tags: from step 4
    - Link: the canonical `link`
-   - Platform: Instagram, TikTok, YouTube or Other
+   - Platform: Instagram, TikTok, YouTube or Other, the label for the script's `platform`
    - Author and Caption: from the preview. If the caption is longer than 2,000 characters, put its start in Caption and the full text in the page body
    - Status: Inbox
    - Captured: today
