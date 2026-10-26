@@ -26,8 +26,9 @@ Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard 
 7. **Schedule the Worker,** as [schedule.md](schedule.md) says. Done when the weekly task exists.
 
 8. **Set up the phone.** The phone's Claude app shares the user's connectors and chat memory, so Notion is already there. The memory you saved in step 6 is this Code tab's own, though, and you cannot write to chat memory. So walk the user through it, one step at a time:
-   - In the Claude app's Chat, on this computer or the phone, in a new chat that is not inside a Project (a Project keeps its own memory), send `Remember: Graveyard Killer Library: <link>`, with "Remember:" in the user's language and the rest exactly as written. Give them the message ready to paste. If memory is off, as on Team and Enterprise plans until the member turns it on, they turn it on in the app's settings first.
-   - On the phone, share a post from Instagram, TikTok or YouTube to the Claude app, with no text, and check that an Entry appears in the Library.
+   - In the Claude app's Chat, on this computer or the phone, in a new chat outside any Project, send `Remember: Graveyard Killer Library: <link>`, with "Remember:" in the user's language and the rest exactly as written. Saved there, the line goes to the account memory, which every chat reads, Projects included unless the user turned that off. Give them the message ready to paste. If memory is off, as on Team and Enterprise plans until the member turns it on, they turn it on in the app's settings first.
+   - Suggest a Project named "Graveyard Killer" in the Claude app's Chat. When they share a post from the phone, they can send it into that Project, so all their saves sit together.
+   - On the phone, share a post from Instagram, TikTok or YouTube to the Claude app's Chat, with no text, and check that an Entry appears in the Library. Saving works with the computer off, since the chat does it.
 
    Done when the user confirms the shared post arrived, or says they will do it later.
 

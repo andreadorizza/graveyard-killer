@@ -15,8 +15,8 @@ You have chosen this job, found the Library and read its Settings (see SKILL.md)
 
    Use these values:
    - **taskId:** `graveyard-killer-worker`
-   - **title:** "Graveyard Killer: weekly Worker", in the Settings language
-   - **description:** "Weekly Graveyard Killer Worker run: finishes the Inbox, digs up the Graveyard and writes the Digest"
+   - **title:** "Graveyard Killer: weekly tidy-up", in the Settings language
+   - **description:** "Finishes the new cards, brings back a few old saves and writes the weekly recap", in the Settings language
    - **notifications:** off, since the Digest tells the user what happened
    - **schedule:** a weekly cron expression in local time, such as `0 10 * * 0` for Sunday at 10:00 (0 is Sunday, 1 is Monday)
    - **prompt:** exactly this, with the Library link filled in:

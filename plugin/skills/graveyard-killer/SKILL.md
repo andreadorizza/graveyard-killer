@@ -9,6 +9,18 @@ Graveyard Killer files the posts a user sends you into their own **Library**, a 
 
 Talk to the user in the language set in their Library's **Settings**. Keep this skill's own words (field and Status names) for your thinking, and write the Library's names into the Library.
 
+With the user, use plain words in their language instead of this skill's terms, and recognise those words when they write them:
+
+| This skill says | Say | In Italian |
+| --- | --- | --- |
+| Library | your Library | la tua Libreria |
+| Worker run | the weekly tidy-up | il riordino settimanale |
+| Digest | the weekly recap | il riepilogo settimanale |
+| Entry | card | scheda |
+| Graveyard | old saves | vecchi salvataggi |
+| dig up | bring back | ripescare |
+| Amnesty | set aside old saves | scartare i vecchi salvataggi |
+
 ## 1. Choose the job
 
 A **Capture** is the user sending you one post's URL to keep it. It arrives as a link on its own, a link inside an app's share text ("Check out this reel!"), or a link with a short "save this". The user is usually on their phone and wants to send the next post in seconds. So finish a Capture in one turn and ask nothing.
