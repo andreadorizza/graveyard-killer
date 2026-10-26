@@ -1,6 +1,6 @@
 ---
 name: graveyard-killer
-description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use whenever the user names Graveyard Killer, for example to run its Worker on the Inbox.
+description: Capture a shared post into the user's Graveyard Killer Library. Use whenever a message is a link (Instagram, TikTok, YouTube or any web page) with no request, such as a bare link, a link inside an app's share text, or a link with a short "save this". Also use whenever the user names Graveyard Killer, for example to set it up, run its Worker, import old saves or show its Digest.
 ---
 
 # Graveyard Killer
@@ -22,12 +22,15 @@ Done when you know the job:
 - **Capture**: follow the steps below, then [references/capture.md](references/capture.md).
 - **Worker run**: follow the steps below, then [references/worker.md](references/worker.md).
 - **Schedule the Worker**: the user asks Graveyard Killer to run its Worker every week, or to change the day or time, for example "schedule the Graveyard Killer worker". Follow the steps below, then [references/schedule.md](references/schedule.md).
+- **Setup**: the user asks to set up Graveyard Killer, or has no Library yet. Go straight to [references/setup.md](references/setup.md), which creates the Library.
+- **Graveyard**: the user asks Graveyard Killer to import their old saves, to dig up a Category next, or for an Amnesty. Follow the steps below, then [references/graveyard.md](references/graveyard.md).
+- **Digest**: the user asks for their Graveyard Killer Digest, or what is new in their Library. Follow the steps below, then [references/digest.md](references/digest.md).
 
 ## 2. Find the Library
 
 Look in your memory for the Library's location, saved as one line: `Graveyard Killer Library: <link>`. Done when you hold the Library link.
 
-- If the line is missing, ask the user once for the link to their Graveyard Killer Library page in Notion. If they have no Library yet, tell them a Library is created during Setup on their computer, and stop.
+- If the line is missing, ask the user once for the link to their Graveyard Killer Library page in Notion. If they have no Library yet: on a computer, offer Setup ([references/setup.md](references/setup.md)); on a phone, tell them Setup runs on their computer, in the Claude Desktop Code tab, and stop.
 - With the link in hand, save that line to your memory if you can. If you cannot, give the user the exact line and ask them to add it to your memory or custom instructions.
 
 ## 3. Read the Settings

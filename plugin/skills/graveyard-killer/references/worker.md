@@ -15,11 +15,16 @@ You have chosen the Worker run, found the Library and read its Settings (see SKI
    - If `speech_model` is `"not downloaded"`, tell the user that the first video downloads the speech model once, over 1 GB, so it takes longer.
 
 2. **List the Inbox.** Query the Entries whose Status is the Library's label for Inbox, oldest Captured first. Captured has no time, so order Entries with the same date by when their pages were created. Done when you hold the list.
-   - If it is empty, tell the user there is nothing to process, and stop.
+   - If it is empty and there are no Buried Entries either, tell the user there is nothing to process, and stop.
 
 3. **Work through the list,** one Entry at a time, as described in [Each Entry](#each-entry). Done when every Entry in the list has a result: Processed, Unavailable, merged, or still in the Inbox with a Note.
+   - If the list is empty, there is nothing to process from the Inbox. Carry on with step 4.
 
-4. **Tell the user how the run went,** in the Settings language and in a few lines. Done when you have sent it.
+4. **Dig up the Graveyard,** as described in [graveyard.md](graveyard.md#dig-up-part-of-each-worker-run). Done when this run's dug-up Entries have their results, or there are no Buried Entries.
+
+5. **Write the Digest,** as described in [digest.md](digest.md#write-the-digest). Done when the Digest page exists.
+
+6. **Tell the user how the run went,** in the Settings language and in a few lines, with the link to the Digest. Done when you have sent it.
    - Give the counts: Processed, Unavailable, merged, and still in the Inbox.
    - List each Entry still in the Inbox, with its Note.
    - If the run found duplicates, list them and ask once whether to move them to the Notion trash. On a yes, trash them. The connector trashes a page only when the user has agreed. On a no, they stay in the Inbox with their Note, and the next run asks again.

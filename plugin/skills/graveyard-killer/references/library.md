@@ -4,10 +4,11 @@ Every Graveyard Killer job reads and writes the Library the same way. This file 
 
 ## Layout
 
-The **Library** is one Notion page. It holds two things:
+The **Library** is one Notion page. It holds:
 
 - the **Entries** database, with one row per Entry. It is the only database on the Library page;
-- a child page titled `Settings`.
+- a child page titled `Settings`;
+- one child page per **Digest**, titled "Week of <date>" in the Settings language (see [digest.md](digest.md)).
 
 The memory line points to the Library page.
 
@@ -29,7 +30,8 @@ The Library uses the user's own names for fields and Statuses, in their language
 | Next action | text | The one thing the user could do with it |
 | Tags | multi-select | Free labels in the Settings language, at most 5 per Entry (see [Writing to Notion](#writing-to-notion)) |
 | Status | select | One Status (see below) |
-| Captured | date | The date of the first Capture |
+| Captured | date | The date of the first Capture. Empty for an Entry imported from the Graveyard |
+| Saved | date | The date the user saved the post on the platform, from the Graveyard import. Empty for a Captured Entry |
 | Note | text | Something about this Entry that needs attention, in the Settings language. It is empty when nothing does |
 
 Each Category can add its own fields. They are named in the Settings and exist as extra properties in the Entries database.
@@ -95,6 +97,7 @@ Italiano
 | Tags | Tag |
 | Status | Stato |
 | Captured | Catturato il |
+| Saved | Salvato il |
 | Note | Nota |
 
 ## Statuses
@@ -116,10 +119,17 @@ Italiano
 
 ## Schedule
 Domenica 10:00
+
+## Graveyard
+| Setting | Value |
+| --- | --- |
+| Dig up per run | 10 |
+| Dig up next | Ricette |
+| Last import | 2026-10-26 |
 ```
 
-Exactly one Category is the fallback. The Schedule is the weekday and the local time of the weekly Worker run. The Category options in the Entries database are the Category names from this table.
+Exactly one Category is the fallback. The Schedule is the weekday and the local time of the weekly Worker run. In the Graveyard section, "Dig up next" is a Category the user asked to see first, or empty; "Last import" is the date of the last Graveyard import, or empty. The Category options in the Entries database are the Category names from this table.
 
 ## Finding an Entry by its link
 
-Query the Entries database for a row whose Link field equals the canonical link exactly.
+Query the Entries database for a row whose Link field equals the canonical link exactly. A link that only a redirect can resolve, such as a TikTok link from an export, may sit in the Library under its full form. When you know the post's id, also look for a Link that contains it.

@@ -21,6 +21,7 @@ TRAILING = ".,;:!?)]}>\"'»”’…"
 INSTAGRAM_POST = re.compile(r"/(?:p|reels?|tv)/(?!audio/)([\w-]+)")
 TIKTOK_POST = re.compile(r"/@[\w.-]+/(?:video|photo)/(\d+)")
 TIKTOK_SHORT_HOSTS = {"vm.tiktok.com", "vt.tiktok.com"}
+TIKTOK_SHARE = re.compile(r"/share/video/(\d+)")
 YOUTUBE_PATH = re.compile(r"/(?:shorts|live)/([\w-]+)")
 # Dropped from every link we do not rebuild, together with every utm_* parameter.
 TRACKING = {"fbclid", "gclid", "igsh", "si"}
@@ -36,7 +37,7 @@ def parse(text: str) -> dict[str, Any]:
         return instagram(shared)
     if host == "youtu.be" or on_site(host, "youtube.com"):
         return youtube(shared)
-    if on_site(host, "tiktok.com"):
+    if on_site(host, "tiktok.com") or on_site(host, "tiktokv.com"):
         return tiktok(shared)
     return result("other", clean(shared), None, [shared])
 
@@ -73,6 +74,9 @@ def tiktok(shared: str) -> dict[str, Any]:
     parts = urlsplit(shared)
     if parts.hostname in TIKTOK_SHORT_HOSTS or parts.path.startswith("/t/"):
         return result("tiktok", clean(shared), None, [shared], resolved=False)
+    share = TIKTOK_SHARE.match(parts.path)
+    if share:  # an export's link: the video id is known, the username is not
+        return result("tiktok", clean(shared), share.group(1), [shared], resolved=False)
     post = TIKTOK_POST.match(parts.path)
     if not post:
         return result("tiktok", clean(shared), None, [shared])

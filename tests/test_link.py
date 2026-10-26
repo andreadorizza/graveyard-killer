@@ -272,3 +272,16 @@ def test_shared_text_can_come_as_arguments() -> None:
 
 def test_text_without_a_link_is_not_a_capture() -> None:
     assert run_link_script("what should I cook tonight?") == {"error": "no link"}
+
+
+def test_tiktok_share_link_from_an_export_is_tiktok_with_its_id() -> None:
+    # TikTok's "Download your data" lists Favorites as tiktokv.com share links, with no username.
+    shared = "https://www.tiktokv.com/share/video/7340000000000000001/"
+
+    assert run_link_script(shared) == {
+        "platform": "tiktok",
+        "link": shared,
+        "id": "7340000000000000001",
+        "resolved": False,
+        "preview_urls": [shared],
+    }
