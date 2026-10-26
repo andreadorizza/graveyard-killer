@@ -21,6 +21,7 @@ Done when you know the job:
 
 - **Capture**: follow the steps below, then [references/capture.md](references/capture.md).
 - **Worker run**: follow the steps below, then [references/worker.md](references/worker.md).
+- **Schedule the Worker**: the user asks Graveyard Killer to run its Worker every week, or to change the day or time, for example "schedule the Graveyard Killer worker". Follow the steps below, then [references/schedule.md](references/schedule.md).
 
 ## 2. Find the Library
 

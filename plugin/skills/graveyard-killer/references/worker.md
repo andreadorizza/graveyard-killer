@@ -4,6 +4,10 @@ The Worker finishes the Entries in the Inbox. It reads each post on the user's o
 
 You have chosen the Worker run, found the Library and read its Settings (see SKILL.md). Run the post script from this skill's folder with `python3`.
 
+**Unattended runs.** When the request says it is an unattended scheduled run, nobody can answer, so ask nothing:
+- if tools are missing, name them and the install commands in the closing summary, and stop;
+- duplicates keep their "Duplicate of" Note and stay in the Inbox, and the closing summary lists them for the user to confirm in a later conversation.
+
 ## Steps
 
 1. **Check the tools.** Run `python3 scripts/post.py check`. Done when it prints `"ok": true`.

@@ -115,10 +115,10 @@ Italiano
 | Altro | Everything else | | yes |
 
 ## Schedule
-Domenica
+Domenica 10:00
 ```
 
-Exactly one Category is the fallback. The Category options in the Entries database are the Category names from this table.
+Exactly one Category is the fallback. The Schedule is the weekday and the local time of the weekly Worker run. The Category options in the Entries database are the Category names from this table.
 
 ## Finding an Entry by its link
 
