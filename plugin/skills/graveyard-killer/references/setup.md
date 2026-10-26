@@ -34,6 +34,6 @@ Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard 
 
 9. **Offer the Graveyard.** Explain that their old saves can come in as Buried Entries, and how to request the exports (see [graveyard.md](graveyard.md#import-the-graveyard)). The exports take a few hours to about 2 days. Once they arrive, the user says "import my Graveyard Killer graveyard". Done when you have told them.
 
-10. **Say how updates arrive.** New versions of the plugin do not install themselves. To update, the user opens *Customize → Plugins → Manage marketplaces* in the Claude app and updates the Graveyard Killer marketplace. Done when you have told them.
+10. **Say how updates arrive.** New versions of the plugin may not install themselves, since the Claude Desktop app can turn plugin auto-update off. To update, the user opens *Customize → Plugins → Manage marketplaces* in the Claude app and updates the Graveyard Killer marketplace. Done when you have told them.
 
 11. **Say the Instagram risk once.** Graveyard Killer reads posts without the user's login, so their account is not used. Instagram may still slow down or block reading from their connection if it reads many posts at once, so a weekly run reads only a few. Done when you have told them.
