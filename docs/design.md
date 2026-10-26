@@ -6,7 +6,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
 
 - **Plugin.** A Claude plugin marketplace with one plugin. Inside it is a standard Agent Skill: `SKILL.md` plus Python scripts. Both scripts, Capture's link script and the Worker's post script, use only the Python standard library and run with `python3`, so the link script also runs in a phone app's sandbox. The tools the post script calls (yt-dlp, gallery-dl, Whisper) are installed with uv. Everything is written in English, and the agent talks in the user's language.
 - **Library.** Notion, Google Sheets or a markdown folder, chosen at setup. Field names are in the user's language. The Library holds its own **Settings**: Categories and their fields, language, schedule. Markdown works from the computer only.
-- **Memory.** One line on each agent surface says where the Library is. In Claude the apps share one memory and the Code tab keeps its own, so setup writes both. If the line is missing, the skill asks for the link once.
+- **Memory.** One line on each agent surface says where the Library is. In Claude the apps share one chat memory and the Code tab keeps its own. Setup writes the Code tab's and gives the user the message that saves the chat one, since a Code tab session cannot write chat memory. If the line is missing, the skill asks for the link once.
 - **Worker.** A local scheduled task in the Claude Desktop Code tab. It runs weekly by default (setup can change it), while the app is open and the computer is awake, and does one catch-up run after sleep. "Run the Graveyard Killer worker" runs it on demand.
 
 ## Flow
@@ -18,7 +18,7 @@ Saved posts die in a folder nobody opens. Graveyard Killer takes a post you shar
    - Finish the Entry: the agent's analysis, a stored thumbnail (none in Sheets), then the media is deleted (a setting keeps it).
    - Dig up the run's quota of Buried Entries, newest first.
    - Last step: write the "Week of …" Digest.
-3. **Digest.** Written weekly, or on request in any chat. When it is shown, the agent may offer Proposals, and it acts only on a yes. It also lists Entries the Worker could not finish, and reminds you every 3 months to re-import your Graveyard.
+3. **Digest.** Written weekly, or on request in any chat. When it is shown, the agent may offer Proposals drawn from what the posts say (add a near event to the calendar, try a recipe this weekend), and it acts only on a yes. It also lists the Entries whose date is in the next 14 days, the Entries the Worker could not finish, and reminds you every 3 months to re-import your Graveyard.
 
 **Statuses:** Inbox → Processed → Used or Dismissed. Also Unavailable (the post is gone; the preview is kept) and Buried.
 
@@ -59,9 +59,9 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 
 - **In:**
   - Instagram (reels, carousels, photos), TikTok and YouTube. Other links are filed with whatever the page shows.
-  - Tested with Claude on Android (Pixel) and Mac.
+  - Tested with Claude on Android (Pixel) and Mac. The iPhone's Share menu also sends to Claude (https://support.claude.com/en/articles/10263469), so iOS capture should work the same way, untested. Claude Desktop's Code tab also runs on Windows and Linux (beta), untested.
 - **Out:**
-  - iOS share-sheet capture, and Instagram Stories.
+  - Instagram Stories.
   - Terminal-agent scheduling.
   - Pushing into other apps.
   - Thumbnails in Sheets.
@@ -78,7 +78,7 @@ Setup is a conversation on the computer, in the Code tab, after the plugin is ad
 
 - [x] The plugin's skill loads in the Claude Android app, and Capture works from Instagram's share menu. (Pixel, 2026-10-24: the Entry was created with Status Inbox.)
 - [x] The synced plugin loads in the Desktop Code tab and inside its scheduled tasks. (2026-10-24: it loads in a new Code tab session. 2026-10-26: a scheduled run loaded it, used the Notion connector in Auto mode and stopped for no approval.)
-- [ ] The installed plugin picks up a new version. (2026-10-26: the Claude app's copy was still at `c80c2cf` two days and several pushes later, and *Check for updates* said "No changes since the last release". Cause: `plugin.json` kept `"version": "0.1.0"` from the first commit, and an install gets new files only when the plugin's version changes (https://code.claude.com/docs/en/plugins/host-marketplace, "Release a new version"). Every push to `main` now raises the version (AGENTS.md, "Releases"), starting with 0.2.0. Per https://claude.com/docs/plugins/overview, a marketplace added from github.com updates on *Check for updates*, or by itself with *Sync automatically* on, and Setup says so. Not checked yet: the app's copy moves to 0.2.0.)
+- [ ] The installed plugin picks up a new version. (2026-10-26: the Claude app's copy was still at `c80c2cf` two days and several pushes later, and *Check for updates* said "No changes since the last release". Cause: `plugin.json` kept `"version": "0.1.0"` from the first commit, and an install gets new files only when the plugin's version changes (https://code.claude.com/docs/en/plugins/host-marketplace, "Release a new version"). Every push to `main` now raises the version (AGENTS.md, "Releases"), starting with 0.2.0. Per https://claude.com/docs/plugins/overview, *Check for updates* on the marketplace in *Customize → Plugins* pulls the latest, and Setup says so. The same page offers *Sync automatically* for a marketplace added from github.com but does not say what it does; for organisations it needs a webhook and admin rights on the repo (https://support.claude.com/en/articles/13837433), so Setup does not promise it. Not checked yet: the app's copy moves to 0.2.0.)
 - [ ] ✗ Claude's fetch tool reads the caption from the embed page. (2026-10-24: refused on the Pixel. From a home connection, the embed page is now a page that JavaScript fills in, with no caption in its HTML, even for public posts.)
 - [ ] Claude's fetch tool on the phone accepts a preview URL that the agent built (the embed page, YouTube oEmbed). Its docs say it fetches only URLs already in the conversation. (2026-10-24 on the Pixel: every Instagram preview URL was refused. A YouTube Short got a full preview, with author, title, Summary and Next action. Which of its two preview URLs served it is not recorded.)
 - [ ] ✗ The fetch tool's text keeps the TikTok caption and the YouTube description from the post page. Their oEmbed endpoints do not return them. (2026-10-24 on the Pixel: a shared TikTok gave no preview at all. YouTube gave the title but not the description.)

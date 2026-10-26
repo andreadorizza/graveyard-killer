@@ -25,15 +25,14 @@ Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard 
 
 7. **Schedule the Worker,** as [schedule.md](schedule.md) says. Done when the weekly task exists.
 
-8. **Set up the phone.** Tell the user, step by step, in the Claude app on their phone:
-   - connect Notion in the app's connectors;
-   - ask Claude there to remember `Graveyard Killer Library: <link>`;
-   - share a post from Instagram, TikTok or YouTube to the Claude app, with no text, and check that an Entry appears in the Library.
+8. **Set up the phone.** The phone's Claude app shares the user's connectors and chat memory, so Notion is already there. The memory you saved in step 6 is this Code tab's own, though, and you cannot write to chat memory. So walk the user through it, one step at a time:
+   - In the Claude app's Chat, on this computer or the phone, in a new chat that is not inside a Project (a Project keeps its own memory), send `Remember: Graveyard Killer Library: <link>`, with "Remember:" in the user's language and the rest exactly as written. Give them the message ready to paste. If memory is off, as on Team and Enterprise plans until the member turns it on, they turn it on in the app's settings first.
+   - On the phone, share a post from Instagram, TikTok or YouTube to the Claude app, with no text, and check that an Entry appears in the Library.
 
    Done when the user confirms the shared post arrived, or says they will do it later.
 
 9. **Offer the Graveyard.** Explain that their old saves can come in as Buried Entries, and how to request the exports (see [graveyard.md](graveyard.md#import-the-graveyard)). The exports take a few hours to about 2 days. Once they arrive, the user says "import my Graveyard Killer graveyard". Done when you have told them.
 
-10. **Say how updates arrive.** A new version reaches the user when the Claude app syncs the Graveyard Killer marketplace. In *Customize → Plugins → Manage marketplaces*, the user can turn on *Sync automatically* for it, so each new version arrives by itself, or select *Check for updates* to get one at once. Done when you have told them.
+10. **Say how updates arrive.** To get the newest version, the user opens *Customize → Plugins* in the Claude app and selects *Check for updates* on the Graveyard Killer marketplace. Done when you have told them.
 
 11. **Say the Instagram risk once.** Graveyard Killer reads posts without the user's login, so their account is not used. Instagram may still slow down or block reading from their connection if it reads many posts at once, so a weekly run reads only a few. Done when you have told them.

@@ -27,7 +27,7 @@ The Library uses the user's own names for fields and Statuses, in their language
 | Caption | text | The post's own text, in its original language |
 | Category | select | One Category from the Settings |
 | Summary | text | In the Settings language: one or two sentences at Capture, two or three after the Worker |
-| Next action | text | The one thing the user could do with it |
+| Next action | text | The one thing the user could do with it. When the post gives a date for it (an event, a deadline, an offer that ends), the Next action names that date in full, such as "Book the Roma concert for 14 November 2026", so the Digest can bring it up in time |
 | Tags | multi-select | Free labels in the Settings language, at most 5 per Entry (see [Writing to Notion](#writing-to-notion)) |
 | Status | select | One Status (see below) |
 | Captured | date | The date of the first Capture. Empty for an Entry imported from the Graveyard |
