@@ -54,6 +54,39 @@ FRAME_SIZE = 1024  # px: frames fit in a square this size
 SCENE_THRESHOLD = 0.3
 # Mean difference per colour channel (0-255) below which two 16x16 thumbnails count as the same frame.
 DUPLICATE_DIFFERENCE = 10
+# Windows error ERROR_SYSTEM_INTEGRITY_POLICY_VIOLATION: Smart App Control refused to start a program.
+BLOCKED_BY_APP_CONTROL = 4551
+# Runs a console script by name inside its own Python, the way its launcher would.
+CONSOLE_SCRIPT = ("import sys; from importlib.metadata import entry_points; sys.argv = sys.argv[1:]; "
+                  "sys.exit(entry_points(group='console_scripts')[sys.argv[0]].load()())")
+
+
+def run(command: list[str], **options: Any) -> subprocess.CompletedProcess[Any]:
+    """subprocess.run, except for a tool that Windows Smart App Control blocks.
+
+    Once Smart App Control is on, it blocks the unsigned launchers that uv puts on PATH
+    (yt-dlp.exe, gallery-dl.exe, whisper-ctranslate2.exe), while the Python inside each
+    tool's environment still runs. So a blocked tool is run again through that Python.
+    """
+    try:
+        return subprocess.run(command, **options)
+    except OSError as refused:
+        python = tool_python(command[0]) if getattr(refused, "winerror", None) == BLOCKED_BY_APP_CONTROL else None
+        if python is None:
+            raise
+        return subprocess.run([str(python), "-c", CONSOLE_SCRIPT, *command], **options)
+
+
+def tool_python(program: str) -> Path | None:
+    """The Python of the uv tool environment that provides program, when there is one."""
+    tools = Path(os.environ.get("UV_TOOL_DIR") or Path(os.environ.get("APPDATA", "")) / "uv" / "tools")
+    if not tools.is_dir():
+        return None
+    for environment in sorted(tools.iterdir()):
+        scripts = environment / "Scripts"
+        if (scripts / f"{program}.exe").is_file() and (scripts / "python.exe").is_file():
+            return scripts / "python.exe"
+    return None
 
 
 def check() -> dict[str, Any]:
@@ -168,6 +201,11 @@ def read(link: str, language: str | None = None) -> dict[str, Any]:
         if isinstance(output, bytes):
             output = output.decode(errors="replace")
         return not_ok(link, folder, output or str(broken))
+    except OSError as refused:
+        if getattr(refused, "winerror", None) != BLOCKED_BY_APP_CONTROL:
+            return not_ok(link, folder, f"{type(refused).__name__}: {refused}")
+        return not_ok(link, folder, "Windows Smart App Control blocked a tool, and no uv tool environment "
+                                    "was found to run it through Python instead")
     except Exception as unexpected:  # odd tool output must still end in JSON, never a traceback
         return not_ok(link, folder, f"{type(unexpected).__name__}: {unexpected}")
 
@@ -218,7 +256,7 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
     on a real 7-slide Instagram carousel, 2026-10-25.
     """
     images_dir = folder / "images"
-    asked = subprocess.run(
+    asked = run(
         # --no-simulate: without it, --dump-single-json writes no files at all.
         ["yt-dlp", *ANONYMOUS, "--ignore-no-formats-error", "--skip-download", "--no-simulate",
          "--dump-single-json", "--no-warnings", "--write-thumbnail", "--convert-thumbnails", "jpg",
@@ -233,7 +271,7 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
         canonical = parse_link(info.get("webpage_url") or link)
         return photos(canonical, folder, images, author_of(info, canonical["platform"]),
                       info.get("description") or "")
-    fetched = subprocess.run(
+    fetched = run(
         ["gallery-dl", "--config-ignore", "--write-metadata", "-D", str(images_dir), "--", link],
         capture_output=True, text=True,
     )
@@ -362,7 +400,7 @@ def caption_track(info: dict[str, Any]) -> tuple[str, str] | None:
 
 def captions(link: str, track: str, source: str, folder: Path) -> str:
     which = "--write-subs" if source == "captions" else "--write-auto-subs"
-    subprocess.run(
+    run(
         ["yt-dlp", *ANONYMOUS, "--skip-download", which, "--sub-langs", track, "--sub-format", "vtt",
          "--no-warnings", "-o", str(folder / "subs.%(ext)s"), "--", link],
         capture_output=True, text=True, check=True,
@@ -386,7 +424,7 @@ def vtt_text(vtt: str) -> str:
 
 
 def download(link: str, folder: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run(
         ["yt-dlp", *ANONYMOUS, "--no-simulate", "--dump-single-json", "--no-warnings", "--no-progress",
          "-f", AT_MOST_720P, "--write-thumbnail", "--convert-thumbnails", "jpg", "--playlist-items", "1",
          "-o", str(folder / "media.%(ext)s"), "--", link],
@@ -526,7 +564,7 @@ def transcribe(media: Path, out_dir: Path, language: str | None) -> tuple[str, s
     command = [engine.program, str(media), *engine.options, str(out_dir)]
     if language and engine.name == "whisper":  # Parakeet takes no language option
         command += ["--language", language]
-    subprocess.run(command, capture_output=True, text=True, check=True)
+    run(command, capture_output=True, text=True, check=True)
     result = json.loads((out_dir / f"{media.stem}.json").read_text(encoding="utf-8"))
     return str(result.get("text", "")).strip(), result.get("language") or language, engine.name
 
