@@ -103,7 +103,7 @@ Read the `caption` and the `transcript`. Look at every image in `keyframes` with
 - Tags, at most 5 on the Entry. Before using a new Tag, [add it](library.md#add-a-tag);
 - Author and Caption from `author` and `caption`, word for word: never shorten, reword or translate the caption. Apply the song-lyrics rule from [library.md](library.md#writing-to-the-library) and your Library app's rule for long text;
 - at the end of the long text, after any lines already there, a Transcript section with one paragraph per item in `transcript_blocks`, word for word in the language spoken, and an On-screen text section with what the keyframes show, leaving out a section that would be empty. When the video has no speech, only music or singing, the transcript is song lyrics or noise: leave the Transcript section out and say in the Summary that the video has only music;
-- the cover, when `cover_url` is not null and the Library app shows covers. With no `cover_url`, the Entry has no cover.
+- the cover, from the image at `thumbnail`: the post's own image, or the first frame of its video. Set it only where the Library app shows covers. A cover that fails is not a failed write: leave it out, and finish the Entry without one.
 
 Done when every write has succeeded. Then set Status to the Library's label for Processed, set Processed to today, and clear the Note. If any write failed, leave the Entry's Status as it is and set the Note to what failed.
 

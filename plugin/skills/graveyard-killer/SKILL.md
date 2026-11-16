@@ -41,6 +41,7 @@ Done when you know the job:
 - **Setup**: the user asks to set up Graveyard Killer, or has no Library yet. On a phone, tell them Setup runs on their computer, in the Claude Desktop Code tab, and stop. Otherwise go straight to [references/setup.md](references/setup.md), which creates the Library.
 - **Graveyard**: the user asks Graveyard Killer to import their old saves, to dig up a Category next, or for an Amnesty. Follow the steps below, then [references/graveyard.md](references/graveyard.md).
 - **Digest**: the user asks for their Graveyard Killer Digest, or what is new in their Library. Follow the steps below, then [references/digest.md](references/digest.md).
+- **Views**: the user asks Graveyard Killer for the gallery or the other views of their Library, or to add them again. Follow the steps below, then [add the views](references/library.md#add-the-views), and say in one line where to find them.
 - **Preference**: the user tells Graveyard Killer to always, never, or ask before making a kind of offer, such as "stop offering grocery lists". Follow the steps below, then [references/ping.md](references/ping.md#when-the-user-answers).
 - **Instagram login**: the user asks to turn Graveyard Killer's Instagram login on or off, or says yes to a Ping's offer to read gated posts with it. Follow the steps below, then [references/login.md](references/login.md).
 

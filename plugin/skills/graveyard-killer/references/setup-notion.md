@@ -8,9 +8,10 @@ Check that your Notion connector works, for example by reading the user's Notion
 
 - the private page with that name;
 - the Entries database inside it, with every field in the user's language, the six Statuses and the Category options;
-- the `Settings` page, with every section. The Limits start at 20 per day and 100 per week, the Instagram login with "Browser" empty and "Reads per run" at 3, and the Version is the newest heading in [upgrade.md](upgrade.md#steps). The Schedule and "Ping by" stay empty until Setup's steps 3 and 9.
+- the `Settings` page, with every section. The Limits start at 20 per day and 100 per week, the Instagram login with "Browser" empty and "Reads per run" at 3, and the Version is the newest heading in [upgrade.md](upgrade.md#steps). The Schedule and "Ping by" stay empty until Setup's steps 3 and 9;
+- the Cover property and the views, as [Add the views](library-notion.md#add-the-views) says.
 
-Done when you can read the Settings back.
+Done when you can read the Settings back. Then tell the user in one line that their posts will show as cards with images in the gallery tab of Entries.
 
 ## Save from the phone
 

@@ -50,7 +50,7 @@ An Entry's **long text** holds what does not fit a field:
 - the full caption, when it is longer than one text value holds in the Library app;
 - a Transcript section and an On-screen text section, written by the Worker. Their headings are "Transcript" and "On-screen text" in the Settings language. Use the same words on every Entry, so look at a Processed Entry for the words already in use (in Italian: "Trascrizione", "Testo a schermo").
 
-An Entry may also have a **cover**: the post's image, where the Library app shows one.
+An Entry may also have a **cover**: the post's image, or the first frame of its video, where the Library app shows one.
 
 ## Writing to the Library
 
@@ -224,6 +224,10 @@ Put a shared save that holds no link out of the Worker's way, when the app has a
 ### Remove a duplicate
 
 Remove an Entry whose Note says it is a duplicate, once the user agrees.
+
+### Add the views
+
+Give the Library the app's own ways to browse the Entries, such as a gallery of covers, with any field they need, as your Library app's file says. An app that has none does nothing. A view the Library already has stays as it is, and so does every Entry.
 
 ### Link to an Entry
 

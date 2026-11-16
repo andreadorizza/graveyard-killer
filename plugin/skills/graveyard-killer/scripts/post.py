@@ -5,6 +5,8 @@
     post.py clean <folder>           delete a work folder that read made
     post.py pause [--login]          wait a random 6 to 12 seconds, between Instagram posts,
                                      or 30 to 90 seconds before a login read
+    post.py upload <image> <upload-url> --header "<name>: <value>" ...
+                                     send an image that read made to a Notion upload URL
 
 A read is logged out, unless --login names a browser on this computer that is signed in
 to Instagram: then it is a login read of an Instagram post (ADR 0001, #13).
@@ -32,10 +34,14 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from platform import machine, system
 from typing import Any, TypeVar
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 from link import parse as parse_link
 
@@ -74,6 +80,9 @@ PAUSE = (6.0, 12.0)
 LOGIN_PAUSE = (30.0, 90.0)
 AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
 NOTION_UPLOAD_LIMIT = 5 * 1024 * 1024  # bytes, on Notion's Free plan
+NOTION_UPLOAD_HOST = "api.notion.com"  # where the Notion connector's file uploads are sent
+UPLOAD_TIMEOUT = 120  # seconds
+UPLOAD_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}  # what read writes
 NOTION_TEXT_BLOCK = 1800  # characters per page-body block, under Notion's 2,000 limit
 # Matched, in this order and ignoring case, against the tool's last error line.
 # A post Instagram hides from logged-out visitors, such as one with an age limit: yt-dlp finds
@@ -557,20 +566,8 @@ def ok(canonical: dict[str, Any], folder: Path, kind: str, frames: list[Path], t
         "transcript_blocks": blocks(post.get("transcript") or ""),
         "keyframes": [str(f) for f in frames],
         "thumbnail": str(thumb),
-        "cover_url": cover_url(canonical),
         "work": str(folder),
     }
-
-
-def cover_url(canonical: dict[str, Any]) -> str | None:
-    """A cover image link that will not expire, for platforms that have one.
-
-    Notion's connector sets a cover only from an external link. YouTube's image
-    host is stable; Instagram's and TikTok's links are signed and expire.
-    """
-    if canonical["platform"] == "youtube" and canonical["id"]:
-        return f"https://i.ytimg.com/vi/{canonical['id']}/hqdefault.jpg"
-    return None
 
 
 def blocks(text: str) -> list[str]:
@@ -840,6 +837,51 @@ def pause(login: bool = False) -> dict[str, float]:
     return {"paused": round(seconds, 1)}
 
 
+def upload(image: Path, upload_url: str, headers: list[str], field: str = "file") -> dict[str, Any]:
+    """Send one image that read made to an upload URL from the Notion connector's file upload:
+    one multipart POST, with the headers the connector gave.
+
+    It sends only to Notion, and only an image inside a work folder that read made, so that
+    no text in a post can make it send another file, or send one somewhere else.
+    """
+    parts = urlsplit(upload_url)
+    if parts.scheme != "https" or parts.hostname != NOTION_UPLOAD_HOST:
+        return {"error": f"not a Notion upload URL: {upload_url}"}
+    image = image.resolve()
+    made_by_read = any((folder / MARKER).is_file() for folder in image.parents)
+    content_type = UPLOAD_TYPES.get(image.suffix.lower())
+    if not (image.is_file() and made_by_read and content_type):
+        return {"error": f"not an image that read made: {image}"}
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", field):
+        return {"error": f"not a form field name: {field}"}
+    request_headers = {}
+    for header in headers:
+        name, colon, value = header.partition(":")
+        if not colon or not name.strip():
+            return {"error": f"not a header: {header}"}
+        if name.strip().lower() != "content-type":  # the multipart body sets its own
+            request_headers[name.strip()] = value.strip()
+    boundary = uuid.uuid4().hex
+    body = b"".join([
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{image.name}"\r\n'.encode(),
+        f"Content-Type: {content_type}\r\n\r\n".encode(),
+        image.read_bytes(),
+        f"\r\n--{boundary}--\r\n".encode(),
+    ])
+    request_headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+    request = Request(upload_url, data=body, headers=request_headers, method="POST")
+    try:
+        with urlopen(request, timeout=UPLOAD_TIMEOUT) as response:
+            answer = json.loads(response.read() or b"{}")
+    except HTTPError as error:
+        return {"error": f"HTTP {error.code}: {error.read().decode(errors='replace')[:300]}"}
+    except (OSError, ValueError) as error:  # no connection, a time-out, or an answer that is not JSON
+        return {"error": str(error)[:300] or type(error).__name__}
+    if not isinstance(answer, dict) or answer.get("status") != "uploaded":
+        return {"error": f"Notion did not take the upload: {json.dumps(answer)[:300]}"}
+    return {"uploaded": answer.get("file_upload_id") or answer.get("id")}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="post.py")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -854,13 +896,21 @@ def main() -> None:
     pause_parser.add_argument("--login", action="store_true", help="the longer pause before a login read")
     clean_parser = commands.add_parser("clean")
     clean_parser.add_argument("folder", type=Path)
+    upload_parser = commands.add_parser("upload")
+    upload_parser.add_argument("image", type=Path, help="an image path from read's output, such as its thumbnail")
+    upload_parser.add_argument("upload_url", help="the upload URL the Notion connector gave")
+    upload_parser.add_argument("--header", action="append", default=[], help='one of its headers, as "name: value"')
+    upload_parser.add_argument("--field", default="file", help="its form field, file unless it says otherwise")
     args = parser.parse_args()
     if args.command == "check":
         print(json.dumps(check()))
     elif args.command == "pause":
         print(json.dumps(pause(args.login)))
-    elif args.command == "clean":
-        result = clean(args.folder)
+    elif args.command in ("clean", "upload"):
+        if args.command == "clean":
+            result = clean(args.folder)
+        else:
+            result = upload(args.image, args.upload_url, args.header, args.field)
         print(json.dumps(result))
         if "error" in result:
             sys.exit(2)

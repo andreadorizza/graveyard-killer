@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
+import json
 import platform
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -670,20 +673,6 @@ def test_many_scenes_give_at_most_8_distinct_keyframes(post: Callable[..., Run],
     assert len({Path(f).read_bytes() for f in frames}) == 8
 
 
-def test_youtube_gets_a_stable_cover_url(post: Callable[..., Run], media: dict[str, Path]) -> None:
-    # Notion's connector takes only an external URL as a cover, and YouTube's image host is stable.
-    run = post("read", VIDEO, scenario=youtube(media))
-
-    assert run.output["cover_url"] == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
-
-
-def test_instagram_and_tiktok_get_no_cover_url(post: Callable[..., Run], media: dict[str, Path]) -> None:
-    # Their image links are signed and expire within days.
-    run = post("read", REEL, scenario=reel(media))
-
-    assert run.output["cover_url"] is None
-
-
 def test_a_long_transcript_comes_in_blocks_that_fit_notion(
     post: Callable[..., Run], media: dict[str, Path]
 ) -> None:
@@ -986,3 +975,85 @@ def test_a_logged_out_read_keeps_the_usual_temporary_folder(post: Callable[..., 
 
     work = Path(run.output["work"])
     assert all(work not in Path(call["tmpdir"]).parents for call in run.calls)
+
+
+UPLOAD_URL = "https://api.notion.com/v1/mcp/file_uploads/41af4b20-8c40-818f-8d78-00b2a2c1c469/send"
+
+
+def post_module() -> Any:
+    """The post script as a module, to stand in for the network in-process."""
+    scripts = str(Path(__file__).parent.parent / "plugin/skills/graveyard-killer/scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    return importlib.import_module("post")
+
+
+class FakeResponse:
+    def __init__(self, body: dict[str, Any]) -> None:
+        self.body = json.dumps(body).encode()
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.body
+
+
+def test_upload_sends_the_thumbnail_to_notion_with_the_connector_headers(
+    post: Callable[..., Run], media: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    thumb = Path(post("read", REEL, scenario=reel(media)).output["thumbnail"])
+    module = post_module()
+    sent: list[Any] = []
+
+    def fake_urlopen(request: Any, timeout: float) -> FakeResponse:
+        sent.append(request)
+        return FakeResponse({"file_upload_id": "abc", "status": "uploaded"})
+
+    monkeypatch.setattr(module, "urlopen", fake_urlopen)
+
+    result = module.upload(thumb, UPLOAD_URL, ["authorization: Bearer t0ken"])
+
+    assert result == {"uploaded": "abc"}
+    request = sent[0]
+    assert request.full_url == UPLOAD_URL
+    assert request.get_method() == "POST"
+    assert request.get_header("Authorization") == "Bearer t0ken"
+    assert request.get_header("Content-type").startswith("multipart/form-data; boundary=")
+    assert b'name="file"; filename="thumbnail.jpg"' in request.data
+    assert thumb.read_bytes() in request.data
+
+
+def test_upload_reports_what_notion_refused(
+    post: Callable[..., Run], media: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    thumb = Path(post("read", REEL, scenario=reel(media)).output["thumbnail"])
+    module = post_module()
+    monkeypatch.setattr(module, "urlopen", lambda request, timeout: FakeResponse({"status": "expired"}))
+
+    result = module.upload(thumb, UPLOAD_URL, ["authorization: Bearer t0ken"])
+
+    assert "expired" in result["error"]
+
+
+def test_upload_sends_nothing_outside_notion(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    thumb = post("read", REEL, scenario=reel(media)).output["thumbnail"]
+
+    for url in ("https://example.com/send", "http://api.notion.com/v1/send", "https://api.notion.com.evil.io/send"):
+        run = post("upload", thumb, url, "--header", "authorization: Bearer t0ken")
+
+        assert run.exit_code != 0
+        assert "not a Notion upload URL" in run.output["error"]
+
+
+def test_upload_sends_only_an_image_that_read_made(post: Callable[..., Run], tmp_path: Path) -> None:
+    private = tmp_path / "passport.jpg"
+    private.write_bytes(b"\xff\xd8\xff")
+
+    run = post("upload", str(private), UPLOAD_URL, "--header", "authorization: Bearer t0ken")
+
+    assert run.exit_code != 0
+    assert "not an image that read made" in run.output["error"]
