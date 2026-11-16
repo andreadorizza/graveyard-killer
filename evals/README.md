@@ -73,3 +73,5 @@ The Worker downloads and transcribes, so the tools from `post.py check` must be 
 These run only against the Drive test Library. Each `expected_output` gives its seed: write rows with the Sheets connector's `update_spreadsheet` (`appendCells`, text as `stringValue`), and put shared files in "Share here" with the Drive connector.
 
 The post script itself is tested in `tests/test_post.py` with fake tools and no network, and in `tests/test_post_live.py` against the real tools (`uv run pytest -m live`).
+
+On Windows with Smart App Control on, `uv run pytest` cannot start: Smart App Control blocks the unsigned `pytest.exe` in `.venv`. Run `uv run python -m pytest` instead. Smart App Control can also block the fake tools' launchers, and then the tests that use them fail with "Windows Smart App Control blocked".
