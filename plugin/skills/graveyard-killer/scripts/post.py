@@ -5,7 +5,9 @@
     post.py clean <folder>           delete a work folder that read made
 
 Calls yt-dlp, gallery-dl, ffmpeg, ffprobe, Parakeet and Whisper as outside
-programs found on PATH. Standard library only.
+programs found on PATH. When Windows Smart App Control blocks a tool that uv
+installed, it runs the tool through the Python of its uv tool environment
+instead (see run). Standard library only.
 
 The caption choice, the keyframe sampling, the work-folder clean-up and the
 update-and-retry on a 403 follow claude-video's /watch skill (MIT,
@@ -57,8 +59,15 @@ DUPLICATE_DIFFERENCE = 10
 # Windows error ERROR_SYSTEM_INTEGRITY_POLICY_VIOLATION: Smart App Control refused to start a program.
 BLOCKED_BY_APP_CONTROL = 4551
 # Runs a console script by name inside its own Python, the way its launcher would.
-CONSOLE_SCRIPT = ("import sys; from importlib.metadata import entry_points; sys.argv = sys.argv[1:]; "
+# `python -c` puts the working folder first on sys.path and a launcher does not: the empty
+# entry goes first, so a .py file in that folder cannot replace a module the tool imports.
+CONSOLE_SCRIPT = ("import sys; sys.path[:] = [p for p in sys.path if p]; "
+                  "from importlib.metadata import entry_points; sys.argv = sys.argv[1:]; "
                   "sys.exit(entry_points(group='console_scripts')[sys.argv[0]].load()())")
+
+
+class BlockedTool(Exception):
+    """Windows Smart App Control refused a tool, and post.py found no other way to run it."""
 
 
 def run(command: list[str], **options: Any) -> subprocess.CompletedProcess[Any]:
@@ -67,26 +76,57 @@ def run(command: list[str], **options: Any) -> subprocess.CompletedProcess[Any]:
     Once Smart App Control is on, it blocks the unsigned launchers that uv puts on PATH
     (yt-dlp.exe, gallery-dl.exe, whisper-ctranslate2.exe), while the Python inside each
     tool's environment still runs. So a blocked tool is run again through that Python.
+    BlockedTool, which names the tool, means that this failed too or was not possible.
     """
+    program = command[0]
     try:
         return subprocess.run(command, **options)
     except OSError as refused:
-        python = tool_python(command[0]) if getattr(refused, "winerror", None) == BLOCKED_BY_APP_CONTROL else None
-        if python is None:
+        if not blocked_by_app_control(refused):
             raise
-        return subprocess.run([str(python), "-c", CONSOLE_SCRIPT, *command], **options)
+        python = tool_python(program)
+        if python is None:
+            raise BlockedTool(f"Windows Smart App Control blocked {program}, and no uv tool environment "
+                              "provides it, so it could not run through Python instead") from refused
+        try:
+            return subprocess.run([str(python), "-c", CONSOLE_SCRIPT, *command], **options)
+        except OSError as again:
+            if not blocked_by_app_control(again):
+                raise
+            raise BlockedTool(f"Windows Smart App Control blocked {program}, and also the Python of its "
+                              f"uv tool environment, {python}") from again
+
+
+def blocked_by_app_control(error: OSError) -> bool:
+    return getattr(error, "winerror", None) == BLOCKED_BY_APP_CONTROL
 
 
 def tool_python(program: str) -> Path | None:
-    """The Python of the uv tool environment that provides program, when there is one."""
-    tools = Path(os.environ.get("UV_TOOL_DIR") or Path(os.environ.get("APPDATA", "")) / "uv" / "tools")
-    if not tools.is_dir():
-        return None
-    for environment in sorted(tools.iterdir()):
-        scripts = environment / "Scripts"
-        if (scripts / f"{program}.exe").is_file() and (scripts / "python.exe").is_file():
-            return scripts / "python.exe"
+    """The Python of the uv tool environment that provides program, when there is one.
+
+    The environment named after the program comes first: a tool that depends on the
+    program, such as one installed with --with yt-dlp, has its own copy, perhaps older.
+    """
+    for tools in tool_dirs():
+        if not tools.is_dir():
+            continue
+        for environment in [tools / program, *sorted(tools.iterdir())]:
+            scripts = environment / "Scripts"
+            if (scripts / f"{program}.exe").is_file() and (scripts / "python.exe").is_file():
+                return scripts / "python.exe"
     return None
+
+
+def tool_dirs() -> list[Path]:
+    """Where uv may keep its tool environments on Windows.
+
+    UV_TOOL_DIR when it is set. Otherwise uv's storage reference names %APPDATA%\\uv\\data\\tools,
+    and %APPDATA%\\uv\\tools, where the Smart App Control fallback was first tested, is tried too.
+    """
+    if os.environ.get("UV_TOOL_DIR"):
+        return [Path(os.environ["UV_TOOL_DIR"])]
+    appdata = Path(os.environ.get("APPDATA", ""))
+    return [appdata / "uv" / "data" / "tools", appdata / "uv" / "tools"]
 
 
 def check() -> dict[str, Any]:
@@ -201,11 +241,8 @@ def read(link: str, language: str | None = None) -> dict[str, Any]:
         if isinstance(output, bytes):
             output = output.decode(errors="replace")
         return not_ok(link, folder, output or str(broken))
-    except OSError as refused:
-        if getattr(refused, "winerror", None) != BLOCKED_BY_APP_CONTROL:
-            return not_ok(link, folder, f"{type(refused).__name__}: {refused}")
-        return not_ok(link, folder, "Windows Smart App Control blocked a tool, and no uv tool environment "
-                                    "was found to run it through Python instead")
+    except BlockedTool as blocked:
+        return not_ok(link, folder, str(blocked))
     except Exception as unexpected:  # odd tool output must still end in JSON, never a traceback
         return not_ok(link, folder, f"{type(unexpected).__name__}: {unexpected}")
 
@@ -214,7 +251,10 @@ def read_post(link: str, folder: Path, language: str | None) -> dict[str, Any]:
     downloaded = download(link, folder)
     if downloaded.returncode != 0 and "http error 403" in last_error(downloaded.stderr).lower():
         # Sites often break older yt-dlp releases: update once, then retry once.
-        subprocess.run(["uv", "tool", "upgrade", "yt-dlp"], capture_output=True)
+        try:  # the update is optional: without uv, or with uv blocked, the retry still runs
+            subprocess.run(["uv", "tool", "upgrade", "yt-dlp"], capture_output=True)
+        except OSError:
+            pass
         downloaded = download(link, folder)
     if downloaded.returncode != 0:
         if matches(last_error(downloaded.stderr), NO_VIDEO):
@@ -507,7 +547,7 @@ def evenly(items: list[T], most: int) -> list[T]:
 
 
 def scene_changes(media: Path) -> list[float]:
-    scan = subprocess.run(
+    scan = run(
         ["ffmpeg", "-hide_banner", "-nostats", "-i", str(media), "-an",
          "-vf", f"scale=160:-2,select='gt(scene,{SCENE_THRESHOLD})',showinfo", "-f", "null", "-"],
         capture_output=True, text=True, check=True,
@@ -516,7 +556,7 @@ def scene_changes(media: Path) -> list[float]:
 
 
 def duration_of(media: Path) -> float:
-    probe = subprocess.run(
+    probe = run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(media)],
         capture_output=True, text=True, check=True,
     )
@@ -525,11 +565,12 @@ def duration_of(media: Path) -> float:
 
 def tiny(image: Path) -> bytes:
     """A 16x16 RGB thumbnail, for spotting near-duplicate frames."""
-    return subprocess.run(
+    done: subprocess.CompletedProcess[bytes] = run(
         ["ffmpeg", "-v", "error", "-i", str(image), "-vf", "scale=16:16", "-f", "rawvideo",
          "-pix_fmt", "rgb24", "-"],
         capture_output=True, check=True,
-    ).stdout
+    )
+    return done.stdout
 
 
 def difference(a: bytes, b: bytes) -> float:
@@ -545,11 +586,11 @@ def save_jpeg(source: Path, out: Path, box: int, quality: int = 3, at: float | N
 
 
 def run_ffmpeg(*args: str) -> None:
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *args], capture_output=True, check=True)
+    run(["ffmpeg", "-v", "error", "-y", *args], capture_output=True, check=True)
 
 
 def has_audio(media: Path) -> bool:
-    probe = subprocess.run(
+    probe = run(
         ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
          "-of", "csv=p=0", str(media)],
         capture_output=True, text=True, check=True,
