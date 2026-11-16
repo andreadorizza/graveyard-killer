@@ -72,7 +72,7 @@ An Entry the user decided not to act on. It stays in the Library.
 _Avoid_: Deleted, archived
 
 **Unavailable**:
-An Entry whose post was deleted or made private before the Worker could download it. It keeps the preview taken at Capture.
+An Entry whose post was deleted or made private before the Worker could download it, or whose post the Worker failed to read 3 times. It keeps the preview taken at Capture.
 _Avoid_: Failed, broken, dead
 
 **Settings**:

@@ -67,7 +67,7 @@ These rules hold in every Library app. Your app's file adds its own.
 | Processed | The Worker finished it |
 | Used | The user did its Next action |
 | Dismissed | The user chose not to act on it |
-| Unavailable | The post was deleted or made private before the Worker could download it |
+| Unavailable | The post was deleted or made private before the Worker could download it, or 3 reads failed ([worker.md](worker.md#failed-tries)) |
 | Buried | Imported from the Graveyard, waiting to be dug up |
 
 A shared save counts as Inbox. The Worker adopts it ([worker.md](worker.md#adopt-the-shared-saves)).

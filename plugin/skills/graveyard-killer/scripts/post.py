@@ -42,6 +42,10 @@ AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
 NOTION_UPLOAD_LIMIT = 5 * 1024 * 1024  # bytes, on Notion's Free plan
 NOTION_TEXT_BLOCK = 1800  # characters per page-body block, under Notion's 2,000 limit
 # Matched, in this order and ignoring case, against the tool's last error line.
+# A post Instagram hides from logged-out visitors, such as one with an age limit: yt-dlp finds
+# no media for them (if_not_gated_logged_out). An Instagram change once gave it for public
+# posts too (yt-dlp #17074), so the Worker stops Instagram after two new ones in a row.
+LOGIN_ONLY = ("instagram sent an empty media response",)
 NEEDS_LOGIN = ("rate-limit reached", "login required", "requiring login", "redirect to login",
                "/accounts/login", "only available for registered users", "sign in to confirm",
                "checkpoint_required", "challenge_required", "authorizationerror")
@@ -303,8 +307,8 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
          "-o", str(images_dir / "%(playlist_index)02d.%(ext)s"), "--", link],
         capture_output=True, text=True,
     )
-    if asked.returncode != 0 and matches(last_error(asked.stderr), NEEDS_LOGIN):
-        return not_ok(link, folder, asked.stderr)  # asking gallery-dl would only meet the same challenge
+    if asked.returncode != 0 and matches(last_error(asked.stderr), LOGIN_ONLY + NEEDS_LOGIN):
+        return not_ok(link, folder, asked.stderr)  # gallery-dl would only meet Instagram's login page
     info: dict[str, Any] = json.loads(asked.stdout) if asked.returncode == 0 and asked.stdout.strip() else {}
     images = images_in(images_dir)
     if images:
@@ -473,9 +477,11 @@ def download(link: str, folder: Path) -> subprocess.CompletedProcess[str]:
 
 
 def not_ok(link: str, folder: Path, tool_output: str) -> dict[str, Any]:
-    """The result for a post that could not be read: unavailable, needs_login or error."""
+    """The result for a post that could not be read: login_only, needs_login, unavailable or error."""
     reason = last_error(tool_output)
-    if matches(reason, NEEDS_LOGIN):
+    if matches(reason, LOGIN_ONLY):
+        status = "login_only"
+    elif matches(reason, NEEDS_LOGIN):
         status = "needs_login"
     elif matches(reason, UNAVAILABLE):
         status = "unavailable"

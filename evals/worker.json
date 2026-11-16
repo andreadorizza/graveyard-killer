@@ -139,6 +139,52 @@
         "'Last Ping' in the Settings is today",
         "After the reply 'yes, always', the grocery list is in the chat and the Preferences table has a row for the recipe Category and that action, answered 'always' in the Settings language"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed: an Inbox Entry for {{INSTAGRAM_GATED_URL}}, an Instagram post shown only to signed-in users, with no Note and captured before the reel Entry of eval 1. The gated Entry waits with a Note, and the reel is still read.",
+      "files": [],
+      "expectations": [
+        "The gated Entry's Status is still the Library's label for Inbox, and its Title still starts with ⏳",
+        "Its Note says, in the Settings language, that Instagram shows the post only to signed-in users, with no try count",
+        "No other field of the gated Entry changed",
+        "The reel Entry read after it is Processed: one gated post does not stop Instagram for the run",
+        "The reply says that the gated post cannot be read without a login, and that it can be opened in Instagram"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed: the test Library as eval 13 left it; run right after eval 13. The gated Entry is left out.",
+      "files": [],
+      "expectations": [
+        "The run's stream has no `post.py read` of the gated Entry's link",
+        "The gated Entry's Status, Title and Note are unchanged",
+        "The reply does not list the gated Entry again"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed: an Inbox Entry for https://www.youtube.com/watch?v=aaaa, a truncated link that the post script reports as `error`, with the Note \"(2/3) Could not read the post\" in the Settings language, and the YouTube Entry of eval 3. Its third try counts, since the other YouTube Entry reads fine, so it ends Unavailable.",
+      "files": [],
+      "expectations": [
+        "The truncated-link Entry's Status is the Library's label for Unavailable, its Processed date is today, and its Title has no ⏳",
+        "Its Note gives the reason followed by 'after 3 tries', in the Settings language",
+        "The other YouTube Entry is Processed",
+        "The reply lists the truncated-link Entry as made Unavailable after 3 failed tries"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed: the same truncated-link Entry with the Note \"(1/3) Could not read the post\", and no other YouTube Entry waiting in the Inbox or the Graveyard. Nothing else on YouTube reads in the run, so the failure does not count.",
+      "files": [],
+      "expectations": [
+        "The truncated-link Entry's Status is still the Library's label for Inbox",
+        "Its Note still starts with (1/3)"
+      ]
     }
   ]
 }

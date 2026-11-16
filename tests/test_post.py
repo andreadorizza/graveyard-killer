@@ -336,6 +336,28 @@ def test_a_login_challenge_needs_login_and_is_not_retried(
     assert run.called("uv") == []
 
 
+# yt-dlp 2026.10.21 on an age-limited post, logged out, 2026-11-16. yt-dlp raises it when the
+# page holds no media for logged-out visitors (if_not_gated_logged_out is empty).
+GATED = ("ERROR: [Instagram] Rk3elTest01: Instagram sent an empty media response. Check if this post is "
+         "accessible in your browser without being logged-in. If it is not, then use --cookies-from-browser "
+         "or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-"
+         "cookies-to-yt-dlp  for how to manually pass cookies. Otherwise, if the post is accessible in "
+         "browser without being logged-in, please report this issue on  https://github.com/yt-dlp/yt-dlp/"
+         "issues?q= , filling out the appropriate issue template. Confirm you are on the latest version "
+         "using  yt-dlp -U")
+
+
+def test_a_post_hidden_from_logged_out_visitors_is_login_only(post: Callable[..., Run]) -> None:
+    run = post("read", REEL, scenario={"yt-dlp": [{"exit": 1, "stderr": GATED}], "uv": [{}]})
+
+    assert run.output["status"] == "login_only"
+    assert "empty media response" in run.output["reason"]
+    assert run.output["platform"] == "instagram"
+    assert len(run.called("yt-dlp")) == 1
+    assert run.called("uv") == []
+    assert run.called("gallery-dl") == []
+
+
 def test_a_link_with_shell_characters_reaches_the_tool_unchanged(post: Callable[..., Run]) -> None:
     # On Windows a .cmd or .bat tool would run through cmd.exe, where & and | start commands.
     link = VIDEO + "&t=1|whoami&echo=%20x"
@@ -444,6 +466,16 @@ def test_gallery_dl_login_challenge_needs_login(post: Callable[..., Run], galler
     run = post("read", CAROUSEL, scenario=scenario)
 
     assert run.output["status"] == "needs_login"
+
+
+def test_a_photo_post_hidden_from_logged_out_visitors_is_login_only(post: Callable[..., Run]) -> None:
+    # gallery-dl would only meet Instagram's login page, which a challenge also gives.
+    scenario = {"yt-dlp": [NO_VIDEO, {"exit": 1, "stderr": GATED}], "gallery-dl": [{}]}
+
+    run = post("read", CAROUSEL, scenario=scenario)
+
+    assert run.output["status"] == "login_only"
+    assert run.called("gallery-dl") == []
 
 
 @pytest.mark.parametrize(

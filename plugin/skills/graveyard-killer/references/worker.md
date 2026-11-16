@@ -9,7 +9,7 @@ You came here from the `graveyard-killer-worker` skill, or from Setup or Recall 
 ## Steps
 
 1. **Check the tools.** Run `python3 scripts/post.py check`. Done when it prints `"ok": true`, or the missing tools are in the Ping.
-   - If tools are missing in a scheduled run, put them in the Ping with the `install` commands it prints, and go to step 6.
+   - If tools are missing in a scheduled run, put them in the Ping with the `install` commands it prints, and go to step 7.
    - Otherwise tell the user which tools are missing, with those commands, and ask once. On a yes, run each install command in the order given, then run `check` again. On a no, stop.
    - If `speech_model` is `"not downloaded"`, say that the first video downloads the speech model once, over 1 GB, so it takes longer. In a scheduled run, say it in the Ping's first line, if there is a Ping.
 
@@ -20,15 +20,18 @@ You came here from the `graveyard-killer-worker` skill, or from Setup or Recall 
 3. **List the Inbox.** [Query the Entries](library.md#query-the-entries) whose Status is the Library's label for Inbox, and [list the shared saves](library.md#list-the-shared-saves). Done when you hold the list in order and every shared save is adopted or set aside as not a post.
    - [Adopt the shared saves](#adopt-the-shared-saves) first.
    - Leave out the Entries whose Note says "Duplicate of": they wait for the user's answer.
+   - Leave out the Entries whose Note says that Instagram shows the post only to signed-in users: the Worker cannot read them yet. The user can still ask for one to be read again ([ping.md](ping.md#when-the-user-answers)).
    - Order the Entries with no Note by Captured, oldest first, then by when they were created. The Entries with a Note, which a past run could not read, come after them.
 
 4. **Work through the list,** one Entry at a time, as [Each Entry](#each-entry) says. Each time you read an Instagram, TikTok or YouTube post, whatever the result, it uses one download from the budget; an Other Entry uses none. Done when every Entry in the list has a result (Processed, Unavailable, merged, or still in the Inbox with a Note), or the budget is spent. Entries the budget did not reach keep their ⏳ and wait for the next run, with no Note.
 
 5. **Dig up the Graveyard** with what is left of the budget, when Dig up is on, as [graveyard.md](graveyard.md#dig-up-part-of-each-worker-run) says. Done when the dug-up Entries have their results, the budget is spent, or there are no Buried Entries.
 
-6. **Gather the Ping,** as [ping.md](ping.md#gather-it) says. Done when you hold its Proposals, its fixes and, when due, its Digest, or know that nothing needs the user.
+6. **Count the failed tries,** as [Failed tries](#failed-tries) says. Done when every Entry this run left with a failed read has its count updated, or is Unavailable.
 
-7. **Send the Ping, or end quietly,** as [ping.md](ping.md#send-it) says. Done when the Ping is sent, or the run has ended with its one-line summary.
+7. **Gather the Ping,** as [ping.md](ping.md#gather-it) says. Done when you hold its Proposals, its fixes and, when due, its Digest, or know that nothing needs the user.
+
+8. **Send the Ping, or end quietly,** as [ping.md](ping.md#send-it) says. Done when the Ping is sent, or the run has ended with its one-line summary.
 
 When the user answers in this chat, later or at once, act as [ping.md](ping.md#when-the-user-answers) says.
 
@@ -64,8 +67,9 @@ An article or any other page has no media to read. If its Summary is empty, read
 3. **Act on its `status`.** Done when the Entry has its result:
    - `ok`: if its `link` differs from the Entry's Link, [merge a duplicate](#merge-a-duplicate) first. Otherwise, [finish the Entry](#finish-the-entry).
    - `unavailable`: set Status to the Library's label for Unavailable, set Processed to today, and remove the ⏳ from the Title. Set the Note to the `reason`, said in the Settings language. Change nothing else.
+   - `login_only`: Instagram shows this post only to signed-in users, and the Worker reads logged out. Leave the Entry's Status as it is, Inbox or Buried, and set its Note to "Instagram shows this post only to signed-in users", in the Settings language. Later runs leave it out. If the Instagram read just before this one, in this run, also gave `login_only`, do this instead: treat both Entries as `needs_login` on Instagram, below, and rewrite the earlier one's Note too. Two in a row can mean that Instagram changed or blocked this connection, not that both posts are hidden: an Instagram change once gave this result for public posts.
    - `needs_login` on Instagram: Instagram challenged the run. Leave the Entry's Status as it is, Inbox or Buried, and set its Note to say that Instagram asked for a login and the next run will retry. Read no more Instagram Entries in this run, and leave them as they are. TikTok and YouTube Entries carry on, since the risk is Instagram's.
-   - `needs_login` on another platform, or `error`: leave the Entry's Status as it is, set the Note to the `reason`, said in the Settings language, and go on.
+   - `needs_login` on another platform, or `error`: leave the Entry's Status as it is, and set the Note to the `reason`, said in the Settings language. Keep the try count at the start of the Note it had, if any ([Failed tries](#failed-tries)). Go on.
 
 4. **Clean up,** whatever the result, when `work` is not null. Run `clean` as a command of its own, not chained with another one, and run it again if it did not print `cleaned`:
 
@@ -101,6 +105,19 @@ Read the `caption` and the `transcript`. Look at every image in `keyframes` with
 - the cover, when `cover_url` is not null and the Library app shows covers. With no `cover_url`, the Entry has no cover.
 
 Done when every write has succeeded. Then set Status to the Library's label for Processed, set Processed to today, and clear the Note. If any write failed, leave the Entry's Status as it is and set the Note to what failed.
+
+## Failed tries
+
+Later runs read again a post whose read ended in `error`, or in `needs_login` on TikTok or YouTube, but not forever: after 3 failed tries it becomes Unavailable. The count sits at the start of the Note, as "(1/3)" or "(2/3)", before the reason, for example "(1/3) Could not read the post: <reason>" in the Settings language. A Note with no count holds 0 tries.
+
+A failure counts as a try only when the post itself is the problem. When nothing else on the same platform read fine in the run, the tool, the connection or the platform may be down, and every waiting post would use up its tries at once.
+
+Go through the Entries this run left with such a failure, after Dig up. Done when each one's count is updated, or it is Unavailable:
+
+- If another read on the same platform ended in `ok` or `unavailable` in this run, the failure counts: add one to the count.
+  - Below 3: write the new count at the start of the Note.
+  - At 3: set Status to the Library's label for Unavailable, set Processed to today, and remove the ⏳ from the Title. Set the Note to the reason followed by "after 3 tries", in the Settings language.
+- Otherwise, leave the Note as it is.
 
 ## After Capture
 

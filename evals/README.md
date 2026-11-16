@@ -35,12 +35,13 @@ It reads `evals/local.json`, which is not committed:
     "{{INSTAGRAM_REEL_URL}}": "https://www.instagram.com/reel/<code>/",
     "{{INSTAGRAM_REEL_URL_AS_P}}": "https://www.instagram.com/p/<code>/",
     "{{INSTAGRAM_CAROUSEL_URL}}": "https://www.instagram.com/p/<code>/",
-    "{{TIKTOK_SHORT_URL}}": "<a vm.tiktok.com or vt.tiktok.com link from TikTok's share menu>"
+    "{{TIKTOK_SHORT_URL}}": "<a vm.tiktok.com or vt.tiktok.com link from TikTok's share menu>",
+    "{{INSTAGRAM_GATED_URL}}": "https://www.instagram.com/p/<code>/"
   }
 }
 ```
 
-The reel and the carousel are public posts; the reel's two links are the same post.
+The reel and the carousel are public posts; the reel's two links are the same post. The gated post is one that Instagram shows only to signed-in users, such as a post from an account with an age limit: a logged-out browser shows a notice instead of the post, and `post.py read` gives `login_only`.
 
 About 15 sessions use up Notion's hourly query allowance on plans below Business: run the Notion evals in batches.
 
@@ -63,6 +64,7 @@ The Worker downloads and transcribes, so the tools from `post.py check` must be 
 - Eval 4 needs a processed TikTok Entry, so run it after eval 2.
 - Eval 8 (an article) stands alone. Eval 9 checks after any run.
 - Eval 11 needs a shared save made through the app's share route, of a reel that is not in the Library yet. Eval 12 needs "Ping by" set to `none` and an empty Preferences table in the test Library's Settings.
+- Eval 14 runs right after eval 13. Evals 15 and 16 seed a Note with a try count by hand; eval 16 needs no other YouTube Entry waiting.
 
 ## Google Drive alone (`drive.json`)
 
