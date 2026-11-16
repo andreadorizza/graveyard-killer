@@ -7,7 +7,7 @@ scenario in $GK_FAKE_SCENARIO:
 
     {"yt-dlp": [{"exit": 1, "stderr": "..."}, {"json": {...}, "media": "...", "thumbnail": "..."}]}
 
-A response may hold: exit, stderr, json (printed; a string is printed as is),
+A response may hold: sleep (seconds before it answers), exit, stderr, json (printed; a string is printed as is),
 media and thumbnail (files copied to where yt-dlp would write them), subs
 (a VTT text), images (yt-dlp photo posts, gallery-dl), metadata (gallery-dl), text and
 language (Parakeet and Whisper).
@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ responses: list[dict[str, Any]] = json.loads(Path(os.environ["GK_FAKE_SCENARIO"]
 if not responses:
     sys.exit(f"fake {tool}: no response in the scenario")
 response = responses[min(index, len(responses) - 1)]
+time.sleep(response.get("sleep", 0))  # a tool that hangs
 
 
 def option(name: str) -> str | None:

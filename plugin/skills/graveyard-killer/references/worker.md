@@ -52,7 +52,7 @@ An article or any other page has no media to read. If its Summary is empty, read
 
 ### Instagram, TikTok and YouTube
 
-1. **Pause before Instagram.** Before each Instagram Entry after the first, wait a random 6 to 12 seconds: `sleep $((RANDOM % 7 + 6))`. Done when the wait is over.
+1. **Pause before Instagram.** Before each Instagram Entry after the first, wait a random 6 to 12 seconds: run `python3 scripts/post.py pause` as a command of its own. Done when it prints `paused`.
 
 2. **Read the post.** Pass the Link through a quoted heredoc, exactly like this, so that no shell ever expands it:
 

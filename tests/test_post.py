@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import platform
 import subprocess
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -391,6 +392,17 @@ def test_a_403_that_survives_the_update_is_an_error(post: Callable[..., Run]) ->
     assert len(run.called("yt-dlp")) == 2
 
 
+def test_a_tool_that_hangs_is_stopped_with_an_error(post: Callable[..., Run]) -> None:
+    # On 2026-11-14 a read sat at 0% CPU for 1 h 46 min and blocked a whole Worker run.
+    started = time.monotonic()
+    run = post("read", REEL, scenario={"yt-dlp": [{"sleep": 10}]}, env={"GK_TIME_LIMIT": "1"})
+
+    assert time.monotonic() - started < 9
+    assert run.output["status"] == "error"
+    assert "yt-dlp" in run.output["reason"] and "stopped" in run.output["reason"]
+    assert Path(run.output["work"]).is_dir()
+
+
 CAROUSEL = "https://www.instagram.com/p/DAbc123xyz/?img_index=1"
 
 
@@ -593,7 +605,7 @@ def test_anything_but_a_web_link_is_refused_before_any_tool_runs(
     assert run.calls == []
 
 
-def test_downloads_are_anonymous_and_at_most_720p(post: Callable[..., Run], media: dict[str, Path]) -> None:
+def test_downloads_are_anonymous_at_most_720p_and_time_out(post: Callable[..., Run], media: dict[str, Path]) -> None:
     # Config files can hold cookies or a login; ignoring them keeps every read anonymous.
     photo_error = {"exit": 1, "stderr": "ERROR: [Instagram] Rk3elTest01: There is no video in this post"}
     scenario = {"yt-dlp": [photo_error, {"json": {"id": "Rk3elTest01"}}], "gallery-dl": [slides(media)]}
@@ -603,9 +615,11 @@ def test_downloads_are_anonymous_and_at_most_720p(post: Callable[..., Run], medi
     assert "height<=720" in download[download.index("-f") + 1]
     for yt_dlp in (download, photos):
         assert "--ignore-config" in yt_dlp and "--no-cookies" in yt_dlp
+        assert yt_dlp[yt_dlp.index("--socket-timeout") + 1] == "30"  # a stalled connection fails fast
         assert yt_dlp[-2:] == ["--", REEL]
     gallery_dl = run.called("gallery-dl")[0]
     assert "--config-ignore" in gallery_dl
+    assert gallery_dl[gallery_dl.index("--http-timeout") + 1] == "30"
     assert gallery_dl[-2:] == ["--", REEL]
 
 
@@ -692,3 +706,15 @@ def test_a_short_transcript_is_one_block(post: Callable[..., Run], media: dict[s
     run = post("read", REEL, scenario=reel(media))
 
     assert run.output["transcript_blocks"] == [run.output["transcript"]]
+
+
+def test_pause_waits_a_random_6_to_12_seconds(post: Callable[..., Run]) -> None:
+    # The Worker's pause between Instagram posts. In the eval runner, which allows only the
+    # skill's own scripts, `sleep $((RANDOM % 7 + 6))` and `python3 -c` needed approval (2026-11-16).
+    started = time.monotonic()
+    run = post("pause", env={"GK_PAUSE_SCALE": "0.01"})
+
+    assert run.exit_code == 0
+    assert 6 <= run.output["paused"] <= 12
+    assert time.monotonic() - started < 5
+    assert run.calls == []

@@ -3,6 +3,7 @@
     post.py check                    which tools are missing, and how to install them
     post.py read [<link>] [--language <code>]   the link comes on stdin when left out
     post.py clean <folder>           delete a work folder that read made
+    post.py pause                    wait a random 6 to 12 seconds, between Instagram posts
 
 Calls yt-dlp, gallery-dl, ffmpeg, ffprobe, Parakeet and Whisper as outside
 programs found on PATH. When Windows Smart App Control blocks a tool that uv
@@ -20,11 +21,13 @@ import argparse
 import html
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from platform import machine, system
@@ -38,6 +41,16 @@ MARKER = ".graveyard-killer-work"
 WEB_LINK = re.compile(r"^https?://\S+$", re.IGNORECASE)
 # No config file, so no cookies or login a user may have set up for yt-dlp elsewhere.
 ANONYMOUS = ("--ignore-config", "--no-cookies")
+# On 2026-11-14 a read sat at 0% CPU for 1 h 46 min and blocked a whole Worker run. A stalled
+# connection now fails after this many seconds of silence, and every tool has a time limit.
+NETWORK_TIMEOUT = "30"  # yt-dlp --socket-timeout, gallery-dl --http-timeout
+YT_DLP = (*ANONYMOUS, "--socket-timeout", NETWORK_TIMEOUT)
+MINUTE = 60
+TIME_LIMITS = {"yt-dlp": 20 * MINUTE, "gallery-dl": 10 * MINUTE, "uv": 5 * MINUTE,
+               "ffmpeg": 15 * MINUTE, "ffprobe": 2 * MINUTE}
+SPEECH_TIME_LIMIT = 60 * MINUTE  # Parakeet or Whisper, on a long video and a slow computer
+# Seconds between Instagram posts, as gallery-dl waits between Instagram requests (ADR 0001).
+PAUSE = (6.0, 12.0)
 AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
 NOTION_UPLOAD_LIMIT = 5 * 1024 * 1024  # bytes, on Notion's Free plan
 NOTION_TEXT_BLOCK = 1800  # characters per page-body block, under Notion's 2,000 limit
@@ -74,7 +87,31 @@ class BlockedTool(Exception):
     """Windows Smart App Control refused a tool, and post.py found no other way to run it."""
 
 
+class ToolTimedOut(Exception):
+    """A tool ran past its time limit, and post.py stopped it."""
+
+
+def time_limit(program: str) -> float:
+    """Seconds program may run. GK_TIME_LIMIT, in seconds, replaces every limit (for the tests)."""
+    if os.environ.get("GK_TIME_LIMIT"):
+        return float(os.environ["GK_TIME_LIMIT"])
+    name = Path(program).name.lower().removesuffix(".exe")
+    return TIME_LIMITS.get(name, SPEECH_TIME_LIMIT)
+
+
 def run(command: list[str], **options: Any) -> subprocess.CompletedProcess[Any]:
+    """Run a tool within its time limit. ToolTimedOut names a tool that ran past it."""
+    program = command[0]
+    options.setdefault("timeout", time_limit(program))
+    try:
+        return run_unblocked(command, **options)
+    except subprocess.TimeoutExpired as slow:
+        limit = float(options["timeout"])
+        took = f"{limit / MINUTE:g} minutes" if limit >= MINUTE else f"{limit:g} seconds"
+        raise ToolTimedOut(f"{Path(program).name} ran for more than {took} and was stopped") from slow
+
+
+def run_unblocked(command: list[str], **options: Any) -> subprocess.CompletedProcess[Any]:
     """subprocess.run, except for a tool that Windows Smart App Control blocks.
 
     Once Smart App Control is on, it blocks the unsigned launchers that uv puts on PATH
@@ -247,6 +284,8 @@ def read(link: str, language: str | None = None) -> dict[str, Any]:
         return not_ok(link, folder, output or str(broken))
     except BlockedTool as blocked:
         return not_ok(link, folder, str(blocked))
+    except ToolTimedOut as slow:
+        return not_ok(link, folder, f"ERROR: {slow}")
     except Exception as unexpected:  # odd tool output must still end in JSON, never a traceback
         return not_ok(link, folder, f"{type(unexpected).__name__}: {unexpected}")
 
@@ -256,8 +295,8 @@ def read_post(link: str, folder: Path, language: str | None) -> dict[str, Any]:
     if downloaded.returncode != 0 and "http error 403" in last_error(downloaded.stderr).lower():
         # Sites often break older yt-dlp releases: update once, then retry once.
         try:  # the update is optional: without uv, or with uv blocked, the retry still runs
-            subprocess.run(["uv", "tool", "upgrade", "yt-dlp"], capture_output=True)
-        except OSError:
+            subprocess.run(["uv", "tool", "upgrade", "yt-dlp"], capture_output=True, timeout=time_limit("uv"))
+        except (OSError, subprocess.TimeoutExpired):
             pass
         downloaded = download(link, folder)
     if downloaded.returncode != 0:
@@ -302,7 +341,7 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
     images_dir = folder / "images"
     asked = run(
         # --no-simulate: without it, --dump-single-json writes no files at all.
-        ["yt-dlp", *ANONYMOUS, "--ignore-no-formats-error", "--skip-download", "--no-simulate",
+        ["yt-dlp", *YT_DLP, "--ignore-no-formats-error", "--skip-download", "--no-simulate",
          "--dump-single-json", "--no-warnings", "--write-thumbnail", "--convert-thumbnails", "jpg",
          "-o", str(images_dir / "%(playlist_index)02d.%(ext)s"), "--", link],
         capture_output=True, text=True,
@@ -316,7 +355,7 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
         return photos(canonical, folder, images, author_of(info, canonical["platform"]),
                       info.get("description") or "")
     fetched = run(
-        ["gallery-dl", "--config-ignore", "--write-metadata", "-D", str(images_dir), "--", link],
+        ["gallery-dl", "--config-ignore", "--http-timeout", NETWORK_TIMEOUT, "--write-metadata", "-D", str(images_dir), "--", link],
         capture_output=True, text=True,
     )
     if fetched.returncode != 0:
@@ -445,7 +484,7 @@ def caption_track(info: dict[str, Any]) -> tuple[str, str] | None:
 def captions(link: str, track: str, source: str, folder: Path) -> str:
     which = "--write-subs" if source == "captions" else "--write-auto-subs"
     run(
-        ["yt-dlp", *ANONYMOUS, "--skip-download", which, "--sub-langs", track, "--sub-format", "vtt",
+        ["yt-dlp", *YT_DLP, "--skip-download", which, "--sub-langs", track, "--sub-format", "vtt",
          "--no-warnings", "-o", str(folder / "subs.%(ext)s"), "--", link],
         capture_output=True, text=True, check=True,
     )
@@ -469,7 +508,7 @@ def vtt_text(vtt: str) -> str:
 
 def download(link: str, folder: Path) -> subprocess.CompletedProcess[str]:
     return run(
-        ["yt-dlp", *ANONYMOUS, "--no-simulate", "--dump-single-json", "--no-warnings", "--no-progress",
+        ["yt-dlp", *YT_DLP, "--no-simulate", "--dump-single-json", "--no-warnings", "--no-progress",
          "-f", AT_MOST_720P, "--write-thumbnail", "--convert-thumbnails", "jpg", "--playlist-items", "1",
          "-o", str(folder / "media.%(ext)s"), "--", link],
         capture_output=True, text=True,
@@ -630,6 +669,14 @@ def new_work_folder() -> Path:
     return folder.resolve()
 
 
+def pause() -> dict[str, float]:
+    """Wait a random PAUSE. A shell sleep with $RANDOM, or python3 -c, needs approval where only
+    the skill's own scripts may run. GK_PAUSE_SCALE shortens the wait (for the tests)."""
+    seconds = random.uniform(*PAUSE)
+    time.sleep(seconds * float(os.environ.get("GK_PAUSE_SCALE", "1")))
+    return {"paused": round(seconds, 1)}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="post.py")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -637,11 +684,14 @@ def main() -> None:
     read_parser.add_argument("link", nargs="?", help="the Entry's Link; read from stdin when left out")
     read_parser.add_argument("--language", help="the spoken language when known, such as it")
     commands.add_parser("check")
+    commands.add_parser("pause")
     clean_parser = commands.add_parser("clean")
     clean_parser.add_argument("folder", type=Path)
     args = parser.parse_args()
     if args.command == "check":
         print(json.dumps(check()))
+    elif args.command == "pause":
+        print(json.dumps(pause()))
     elif args.command == "clean":
         result = clean(args.folder)
         print(json.dumps(result))
