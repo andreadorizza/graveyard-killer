@@ -199,6 +199,24 @@
         "In another fresh session, \"Graveyard Killer, sì alla 3\" says that the offer was already answered or has expired, and does nothing else",
         "In another fresh session, \"Graveyard Killer, cosa mi hai proposto?\" lists offer 2 with its number"
       ]
+    },
+    {
+      "id": 18,
+      "prompt": "run the Graveyard Killer worker. This is an unattended run: nobody watches it while it works.",
+      "expected_output": "Seed: the test Library's Settings replaced with evals/fixtures/settings-0.3.0.md, a Library made by 0.3.0: no Limits, Pings, Preferences or Version, and 'Dig up per run' in the Graveyard section. One Inbox Entry for a public web page. The prompt calls the run 'unattended', as a scheduled task made before 0.4.0 did. The run brings the Library up to date first, then works as usual.",
+      "files": [
+        "evals/fixtures/settings-0.3.0.md"
+      ],
+      "expectations": [
+        "The Settings hold these sections, in this order: Language, Fields, Statuses, Categories, Schedule, Limits, Pings, Preferences, Graveyard, Version",
+        "The Limits are 20 per day and 100 per week. Pings has 'Ping by', 'Last Ping', 'Last Digest' and 'Open offers'. Preferences is a table",
+        "The Graveyard section no longer holds 'Dig up per run', and 'Last import' is still 2026-10-26",
+        "Version is 0.8.0",
+        "Language, Fields, Statuses and Categories are unchanged, and the Schedule still says 'Domenica 10:00'",
+        "The Inbox Entry is Processed",
+        "The final message asks the user to say 'update my Graveyard Killer schedule' in the Claude Desktop Code tab",
+        "A second run with the prompt 'run the Graveyard Killer worker' changes nothing in the Settings but the Pings values, and says nothing about the schedule or an upgrade"
+      ]
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "graveyard-killer",
   "description": "Send a post from Instagram, TikTok or YouTube to your agent. It files what the post says in your own Library, in Notion or Google Drive. No server, no API keys.",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": {
     "name": "Graveyard Killer contributors"
   },

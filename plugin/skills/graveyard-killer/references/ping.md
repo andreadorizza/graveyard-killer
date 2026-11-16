@@ -12,7 +12,7 @@ Done when you hold the three parts below, each of them possibly empty.
 
 1. **Proposals.** For each Entry this run finished (Processed, from the Inbox or dug up), look for one action that uses its content in the coming days, in the post's own terms. For example: an event or a deadline goes in the calendar, a recipe becomes a grocery list, a workout starts on Monday, a tool gets tried on the user's own project. Offer only what helps this week, and only an action you would carry out yourself, in the chat or with your own tools. Putting the Entry on a list, or reminding the user of its Next action, is not a Proposal. Most Entries get none.
    - Its **kind** is the Entry's Category and the action, such as "Ricette · lista della spesa".
-   - Look up the kind in the Preferences. **Never**: drop it. **Always**: do it now, as [On a yes](#on-a-yes) says, and list it as done. **Ask me**, or no Preference yet: offer it.
+   - Look up the kind in the Preferences, whose answers are in the Settings language, such as "chiedimi" for ask me. **Never**: drop it. **Always**: do it now, as [On a yes](#on-a-yes) says, and list it as done. **Ask me**: offer it, with no Preference question: the user has answered it. **No row for the kind**: offer it, with the Preference question ([Send it](#send-it), step 3).
    - "Always" never covers an action that reaches other people or costs money: offer that one every time.
    - Order them by urgency, a date soonest first, then by how much each would help this week. Keep at most 5 offers. The rest are dropped: each Proposal is offered once, by the run that reads its Entry.
 2. **Fixes:** what only the user can solve.
@@ -23,7 +23,7 @@ Done when you hold the three parts below, each of them possibly empty.
    - Entries this run made Unavailable after 3 failed tries ([worker.md](worker.md#failed-tries)).
    - Duplicates this run found: Entries whose Note it set to "Duplicate of". Ask whether to [remove them](library.md#remove-a-duplicate).
    - Shared saves this run moved out of the way because they held no link, when [Set a shared save aside](library.md#set-a-shared-save-aside) moved them: one line naming them, such as "1 shared save held no link: <name>".
-   - A scheduled run whose prompt is from before version 0.4.0 (it calls the run "unattended"): ask the user to say "update my Graveyard Killer schedule" in the Code tab, which also makes the run daily.
+   - What bringing the Library up to date at the start of this run asked of the user, such as updating the schedule or the plugin ([upgrade.md](upgrade.md)).
 3. **The Digest,** when "Last Ping" in the Settings' Pings section is 7 or more days ago, or empty, and the Library has Entries Processed since "Last Digest". Gather it as [digest.md](digest.md#give-the-digest) says.
 
 ## Send it

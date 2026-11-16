@@ -22,7 +22,7 @@ The Google Drive steps of [setup.md](setup.md). Read [library-google-drive.md](l
 
 5. **Write the Settings** in the `Settings` tab with `updateCells`, laid out as library-google-drive.md's [Layout](library-google-drive.md#layout) says: every section of library.md in order, then Folders with the three folders' names and links. Done when you can read the Settings back with `get_values`.
    - The Fields table also names Captures, Transcript and On-screen text.
-   - The Limits start at 20 per day and 100 per week.
+   - The Limits start at 20 per day and 100 per week, and the Version is the newest heading in [upgrade.md](upgrade.md#steps).
    - The Schedule and "Ping by" stay empty until Setup's steps 3 and 9, and the Preferences table holds only its header row.
 
 The Library link, for the pointer, is the Sheet's link without a query string or a `#` part: `https://docs.google.com/spreadsheets/d/<id>/edit`.

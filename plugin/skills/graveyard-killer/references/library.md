@@ -147,16 +147,20 @@ Ogni giorno 13:00
 | --- | --- |
 | Dig up next | Ricette |
 | Last import | 2026-10-26 |
+
+## Version
+0.8.0
 ```
 
 - **Categories.** Exactly one is the fallback. The Category field's choices are the Category names from this table.
 - **Schedule.** When the Worker runs, in local time: every day by default, or the weekdays the user chose.
 - **Limits.** How many posts the Worker may download, counted from the Processed dates ([worker.md](worker.md#steps), step 2).
-- **Pings.** "Ping by" is how a Ping reaches the user: `push`, `email` or `none`. A Library from 0.4.0 may hold `notion`, which never notified the user: treat it as `none` ([ping.md](ping.md#send-it)). "Last Ping" and "Last Digest" are dates, or empty. "Open offers" holds the numbered offers of the last 7 days' Pings that the user has not answered yet, one per line: the number, the Ping's date, the kind, the offer in a few words and the link to its Entry, separated by " · ". It is empty when none is open ([ping.md](ping.md#send-it)).
+- **Pings.** "Ping by" is how a Ping reaches the user: `push`, `email` or `none` ([ping.md](ping.md#send-it)). "Last Ping" and "Last Digest" are dates, or empty. "Open offers" holds the numbered offers of the last 7 days' Pings that the user has not answered yet, one per line: the number, the Ping's date, the kind, the offer in a few words and the link to its Entry, separated by " · ". It is empty when none is open ([ping.md](ping.md#send-it)).
 - **Preferences.** One row per kind of Proposal: its Category and action, and the user's answer (always, ask me or never, in the Settings language). It starts empty ([ping.md](ping.md)).
 - **Graveyard.** "Dig up next" is a Category the user asked to see first, or empty. "Last import" is the date of the last Graveyard import, or empty.
+- **Version.** The Library's format: the newest step of [upgrade.md](upgrade.md) that it has had. Only Setup and an upgrade write it.
 
-A new Library starts with the Limits above and every other new setting empty. A Library made before version 0.4.0 may lack a section, or still hold "Dig up per run", which the Limits replace. Use the defaults for a missing section, and add the section, in the order shown above, the first time you write to it. A Library made before version 0.7.0 lacks the "Open offers" row: treat it as empty, and add the row the first time you write to the Pings section.
+A new Library starts with the Limits above, Version at the newest heading in [upgrade.md](upgrade.md#steps), and every other new setting empty. An older Library may lack a section or a row, or hold one that a later version replaced: [upgrade.md](upgrade.md) says how to read it, and how a Worker run brings it up to date.
 
 ## Operations
 

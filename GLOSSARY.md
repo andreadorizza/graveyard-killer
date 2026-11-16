@@ -79,6 +79,10 @@ _Avoid_: Failed, broken, dead
 The part of the Library that holds the user's Categories, field names, language, schedule, limits and Preferences. Every agent reads it from there.
 _Avoid_: Config, memory
 
+**Upgrade**:
+Bringing a Library made by an older version of Graveyard Killer up to date, one idempotent step per version, at the start of a Worker run. The Settings' Version names the newest step the Library has had.
+_Avoid_: Migration, update (an update is a new plugin version)
+
 ### Using the Library
 
 **Digest**:

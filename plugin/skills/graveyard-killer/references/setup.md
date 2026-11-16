@@ -4,7 +4,7 @@ Setup is a conversation on the user's computer, in the Claude Desktop Code tab, 
 
 Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard Killer job finds no Library. It does not need an existing Library, so skip SKILL.md's steps 2 and 3. Talk in the language the user writes in. It becomes the Settings language: say so in your first question, so the user can pick another.
 
-**A user who says they already have a Library,** set up on another computer: ask for its link, read its Settings as SKILL.md's step 3 says, and do steps 4 and 6 to 9 here, skipping one the user says is already done. Tell them to keep the scheduled Worker on one computer only, and to delete the task on the other one.
+**A user who says they already have a Library,** set up on another computer: ask for its link, read its Settings as SKILL.md's step 3 says, which also brings a Library made by an older version up to date ([upgrade.md](upgrade.md)), and do steps 4 and 6 to 9 here, skipping one the user says is already done. Tell them to keep the scheduled Worker on one computer only, and to delete the task on the other one.
 
 ## Steps
 

@@ -59,6 +59,8 @@ Every prompt is "run the Graveyard Killer worker". What differs is the Library's
 
 The Worker downloads and transcribes, so the tools from `post.py check` must be installed first.
 
+**Upgrades.** Eval 18 starts from a Library made by an older version: replace the test Library's Settings with [fixtures/settings-0.3.0.md](fixtures/settings-0.3.0.md) (on Drive, write it into the `Settings` tab as library-google-drive.md's Layout says, keeping the Folders section). The fixture is frozen: never update it to the current Settings. A release that adds an upgrade step runs eval 18 ([ADR-0006](../docs/adr/0006-libraries-upgrade-themselves.md)).
+
 **Order:**
 - Evals 1 to 3 can share one run, after Capture evals 1, 4 and 5: then check each eval's expectations.
 - Eval 4 needs a processed TikTok Entry, so run it after eval 2.

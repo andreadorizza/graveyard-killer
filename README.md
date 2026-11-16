@@ -16,7 +16,7 @@ Your saved posts are a graveyard. Graveyard Killer turns them into a Library in 
 2. Find **Graveyard Killer** under *Discover* and add it. Adding the marketplace alone is not enough.
 3. In the Code tab, open a session in an empty folder and type `Set up Graveyard Killer`. Setup asks what you save and whether your Library lives in Notion or Google Drive, creates it, schedules the daily run, tests one post end to end and shows you how to save from the phone.
 
-To get a new version, open *Customize → Plugins* and choose *Check for updates* on this marketplace.
+To get a new version, open *Customize → Plugins* and choose *Check for updates* on this marketplace. After an update, the next tidy-up brings your Library up to date by itself, and its message tells you if something needs you, such as updating the schedule.
 
 Other agents can install the skills with `npx skills add andreadorizza/graveyard-killer`, with a Notion, or Google Drive and Sheets, MCP server and your own scheduler. That route is untested.
 
