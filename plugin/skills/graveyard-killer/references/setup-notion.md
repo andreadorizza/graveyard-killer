@@ -8,7 +8,7 @@ Check that your Notion connector works, for example by reading the user's Notion
 
 - the private page with that name;
 - the Entries database inside it, with every field in the user's language, the six Statuses and the Category options;
-- the `Settings` page, with every section. The Limits start at 20 per day and 100 per week, and the Version is the newest heading in [upgrade.md](upgrade.md#steps). The Schedule and "Ping by" stay empty until Setup's steps 3 and 9.
+- the `Settings` page, with every section. The Limits start at 20 per day and 100 per week, the Instagram login with "Browser" empty and "Reads per run" at 3, and the Version is the newest heading in [upgrade.md](upgrade.md#steps). The Schedule and "Ping by" stay empty until Setup's steps 3 and 9.
 
 Done when you can read the Settings back.
 

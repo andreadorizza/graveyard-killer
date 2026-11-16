@@ -30,7 +30,7 @@ argv = sys.argv[1:]
 
 log = Path(os.environ["GK_FAKE_LOG"])
 with log.open("a") as f:
-    f.write(json.dumps({"tool": tool, "argv": argv}) + "\n")
+    f.write(json.dumps({"tool": tool, "argv": argv, "tmpdir": os.environ.get("TMPDIR")}) + "\n")
 
 calls = [json.loads(line) for line in log.read_text().splitlines()]
 index = sum(1 for c in calls if c["tool"] == tool) - 1
@@ -45,8 +45,9 @@ def option(name: str) -> str | None:
     return argv[argv.index(name) + 1] if name in argv else None
 
 
+if response.get("stderr"):  # an error, or warnings from a tool that goes on
+    sys.stderr.write(response["stderr"] + "\n")
 if response.get("exit", 0):
-    sys.stderr.write(response.get("stderr", "") + "\n")
     sys.exit(response["exit"])
 
 if tool == "yt-dlp":

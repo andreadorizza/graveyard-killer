@@ -22,6 +22,10 @@ _Avoid_: Queue, pending
 The agent on the user's own computer that turns Captures in the Inbox into finished Entries, because only that computer can download with the user's login.
 _Avoid_: Server, daemon, bot
 
+**Login read**:
+A second read of a gated Instagram post, one that Instagram shows only to signed-in users, with the user's own login, taken from a browser on their computer. Off until the user turns it on, and capped per Worker run.
+_Avoid_: Logged-in download, cookie read, authenticated fetch
+
 **Graveyard**:
 The posts a user saved inside the platforms before using Graveyard Killer: the Instagram Saved collection, TikTok Favorites, YouTube Watch Later.
 _Avoid_: Backlog, old saves, archive

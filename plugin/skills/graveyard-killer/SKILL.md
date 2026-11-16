@@ -42,6 +42,7 @@ Done when you know the job:
 - **Graveyard**: the user asks Graveyard Killer to import their old saves, to dig up a Category next, or for an Amnesty. Follow the steps below, then [references/graveyard.md](references/graveyard.md).
 - **Digest**: the user asks for their Graveyard Killer Digest, or what is new in their Library. Follow the steps below, then [references/digest.md](references/digest.md).
 - **Preference**: the user tells Graveyard Killer to always, never, or ask before making a kind of offer, such as "stop offering grocery lists". Follow the steps below, then [references/ping.md](references/ping.md#when-the-user-answers).
+- **Instagram login**: the user asks to turn Graveyard Killer's Instagram login on or off, or says yes to a Ping's offer to read gated posts with it. Follow the steps below, then [references/login.md](references/login.md).
 
 ## 2. Find the Library
 

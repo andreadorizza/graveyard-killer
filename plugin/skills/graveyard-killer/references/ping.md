@@ -19,7 +19,12 @@ Done when you hold the three parts below, each of them possibly empty.
    - Missing tools, with their install commands.
    - Instagram asked for a login, and how many Instagram Entries wait for the next run.
    - Entries this run left with a new Note, in the Inbox or Buried. An Entry that fails again for the reason its Note already gave is not news, even when its try count went up: it waits for the Digest's Needs you list, so that one dead link does not ping the user every day.
-   - Entries this run found that Instagram shows only to signed-in users: say that Graveyard Killer reads without a login, so it cannot read them and later runs skip them. The user can open them in Instagram, or ask to read one again later. An Entry the run skipped because its Note already said so is not news.
+   - Entries this run found gated: those whose Note it set to "Instagram shows this post only to signed-in users" ([worker.md](worker.md#gated-posts)), with links. An Entry whose Note already said so, or that the run skipped, is not news, so this comes once per post.
+     - While login reads are off, say that Graveyard Killer reads logged out, so it cannot read them and later runs skip them, and that the user can open them in Instagram. Add one offer, in the Settings language: "Read them with your Instagram login? Say yes here, or 'turn on Graveyard Killer's Instagram login' in any chat on your computer, to hear what that means." It carries no number.
+     - While they are on, say that a later run reads them with the login.
+   - A challenge to the user's account during a login read: login reads are off now. Ask the user to check the Instagram app for a warning, and to say "turn Graveyard Killer's Instagram login back on" when they want them again.
+   - A browser problem during a login read: the `reason`, in plain words, and what to do. Say that login reads stopped for this run only, and that saying "turn on Graveyard Killer's Instagram login" in the Claude Desktop Code tab tests the browser again while the user watches, or picks another one. [login.md](login.md#browser-problems) lists the usual reasons.
+   - Gated Entries that even the login could not see: those whose Note this run set to "Instagram hides this post even from your login", and those it made Unavailable for that reason. Say that the browser may not be signed in to Instagram, or that the post's limits leave out the account too.
    - Entries this run made Unavailable after 3 failed tries ([worker.md](worker.md#failed-tries)).
    - Duplicates this run found: Entries whose Note it set to "Duplicate of". Ask whether to [remove them](library.md#remove-a-duplicate).
    - Shared saves this run moved out of the way because they held no link, when [Set a shared save aside](library.md#set-a-shared-save-aside) moved them: one line naming them, such as "1 shared save held no link: <name>".
@@ -52,6 +57,7 @@ The user answers in the run's chat, maybe hours later, or in any other Claude ch
 - "What did Graveyard Killer offer?" or the like: list the Open offers, with their numbers and links.
 - A Preference ("always", "never", "stop offering grocery lists"): [write the Settings](library.md#write-the-settings), adding or updating its row in the Preferences table, with the kind and the answer in the Settings language. An answer about an offer's number takes the kind from its line in Open offers. A user can also change a Preference from any chat: "Graveyard Killer, stop offering grocery lists".
 - A yes to the duplicates: [remove them](library.md#remove-a-duplicate). On a no, they stay, and the Digest lists them under Needs you.
+- A yes to reading gated posts with the Instagram login, or a request to turn Graveyard Killer's Instagram login on or off: follow [login.md](login.md).
 - "I did it" about an Entry: set its Status to the Library's label for Used. "I don't want it": set Dismissed. It stays in the Library.
 - "Try that one again" about an Entry still in the Inbox or Buried: read it now, as [worker.md](worker.md#each-entry) says, even when its Note says that Instagram shows it only to signed-in users. A failure here does not add a try. In a chat with no shell, such as a phone app, say that posts are read on the computer: ask there, in the Claude Desktop Code tab.
 

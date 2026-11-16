@@ -1,9 +1,13 @@
 """Read one post for the Worker: a link in, one JSON object and files out.
 
     post.py check                    which tools are missing, and how to install them
-    post.py read [<link>] [--language <code>]   the link comes on stdin when left out
+    post.py read [<link>] [--language <code>] [--login <browser>]   the link comes on stdin when left out
     post.py clean <folder>           delete a work folder that read made
-    post.py pause                    wait a random 6 to 12 seconds, between Instagram posts
+    post.py pause [--login]          wait a random 6 to 12 seconds, between Instagram posts,
+                                     or 30 to 90 seconds before a login read
+
+A read is logged out, unless --login names a browser on this computer that is signed in
+to Instagram: then it is a login read of an Instagram post (ADR 0001, #13).
 
 Calls yt-dlp, gallery-dl, ffmpeg, ffprobe, Parakeet and Whisper as outside
 programs found on PATH. When Windows Smart App Control blocks a tool that uv
@@ -45,12 +49,29 @@ ANONYMOUS = ("--ignore-config", "--no-cookies")
 # connection now fails after this many seconds of silence, and every tool has a time limit.
 NETWORK_TIMEOUT = "30"  # yt-dlp --socket-timeout, gallery-dl --http-timeout
 YT_DLP = (*ANONYMOUS, "--socket-timeout", NETWORK_TIMEOUT)
+GALLERY_DL = ("--config-ignore", "--http-timeout", NETWORK_TIMEOUT)
+# Login reads. The browsers whose cookies both yt-dlp and gallery-dl can read (their cookies.py,
+# yt-dlp 2026.10.21 and gallery-dl 1.32.17, checked 2026-11-16).
+BROWSERS = ("brave", "chrome", "chromium", "edge", "firefox", "opera", "safari", "vivaldi")
+# A browser, then optionally ":" and a profile name of letters, digits, spaces, dots, dashes and
+# underscores that starts with a letter or digit. So no path, keyring, container or tool option.
+BROWSER_VALUE = re.compile(r"(?P<browser>[A-Za-z]+)(?::(?P<profile>[^\W_][\w .-]{0,63}))?")
+# A tool's warning that it could not use the browser's login: gallery-dl's "cookies: ..." lines,
+# and yt-dlp's from cookies.py and its Instagram extractor (2026.10.21). Both tools then go on
+# logged out, so a gated post looks hidden even from the login, or the login page looks like a
+# challenge to the account. A login read with such a warning is a browser problem instead.
+COOKIE_WARNING = re.compile(
+    r"\]\[warning\] cookies:|^WARNING: .*(find-generic-password|cannot decrypt v1\d cookies|failed to decrypt cookie"
+    r"|unknown cookie version|without sqlite3 support|cookies database version|networkwallet|kwallet"
+    r"|account cookies are no longer valid)", re.IGNORECASE)
 MINUTE = 60
 TIME_LIMITS = {"yt-dlp": 20 * MINUTE, "gallery-dl": 10 * MINUTE, "uv": 5 * MINUTE,
                "ffmpeg": 15 * MINUTE, "ffprobe": 2 * MINUTE}
 SPEECH_TIME_LIMIT = 60 * MINUTE  # Parakeet or Whisper, on a long video and a slow computer
 # Seconds between Instagram posts, as gallery-dl waits between Instagram requests (ADR 0001).
 PAUSE = (6.0, 12.0)
+# Seconds before a login read, on top of PAUSE. A choice, not a measurement: no safe rate is known.
+LOGIN_PAUSE = (30.0, 90.0)
 AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
 NOTION_UPLOAD_LIMIT = 5 * 1024 * 1024  # bytes, on Notion's Free plan
 NOTION_TEXT_BLOCK = 1800  # characters per page-body block, under Notion's 2,000 limit
@@ -66,6 +87,7 @@ UNAVAILABLE = ("video unavailable", "video is unavailable", "private video", "th
                "http error 404", "404 not found", "does not exist", "this post is unavailable")
 NO_VIDEO = ("no video", "unsupported url")
 IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
+VIDEO_TYPES = {".mp4", ".mov", ".m4v", ".webm"}
 MAX_IMAGES = 10
 MAX_KEYFRAMES = 8
 MAX_CANDIDATES = 24  # frames looked at before near-duplicates are dropped
@@ -268,13 +290,85 @@ def missing_tools() -> str:
     return ", ".join(gone) or "a tool"
 
 
-def read(link: str, language: str | None = None) -> dict[str, Any]:
+@dataclass(frozen=True)
+class Access:
+    """How the tools reach the platform: logged out, or with a browser's cookies for a login read."""
+
+    yt_dlp: tuple[str, ...]
+    gallery_dl: tuple[str, ...]
+    login: bool
+    # yt-dlp's warnings stay on for a login read, to tell a browser problem from a gated post.
+    quiet: tuple[str, ...] = ("--no-warnings",)
+
+
+LOGGED_OUT = Access(YT_DLP, GALLERY_DL, login=False)
+
+
+def login_access(value: str) -> Access | None:
+    """The tools with the cookies of the browser profile that value names, or None for a bad value.
+
+    Both tools still ignore their config files. gallery-dl loads only Instagram's cookies, and for
+    Firefox it reads every container, as yt-dlp does by default, so both tools see the same login.
+    yt-dlp loads every cookie of the browser, so it may use only its Instagram extractor.
+    Neither gets --cookies <file>, so no cookie file is written: yt-dlp reads a copy of the
+    browser's cookie database in a temporary folder that it deletes itself.
+    """
+    found = BROWSER_VALUE.fullmatch(value)
+    if not found or found["browser"].lower() not in BROWSERS:
+        return None
+    browser, profile = found["browser"].lower(), found["profile"]
+    in_profile = f":{profile}" if profile else ""
+    every_container = "::all" if browser == "firefox" else ""
+    return Access(
+        ("--ignore-config", "--use-extractors", "Instagram", "--cookies-from-browser", browser + in_profile,
+         "--socket-timeout", NETWORK_TIMEOUT),
+        ("--config-ignore", "--cookies-from-browser", f"{browser}/.instagram.com{in_profile}{every_container}",
+         "--http-timeout", NETWORK_TIMEOUT),
+        login=True,
+        quiet=(),
+    )
+
+
+def keep_cookie_copies_in(folder: Path) -> None:
+    """Make the tools put their copy of the browser's cookie database inside the work folder.
+
+    yt-dlp and gallery-dl copy it to a temporary folder and delete it when they finish, but not
+    when post.py stops them at their time limit. Inside the work folder, clean deletes it then too.
+    """
+    temporary = folder / "tmp"
+    temporary.mkdir()
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        os.environ[name] = str(temporary)
+
+
+def refused(link: str, reason: str) -> dict[str, Any]:
+    """A read stopped before any tool ran."""
+    return {"status": "error", "reason": reason, "link": link, "work": None}
+
+
+def read(link: str, language: str | None = None, login: str | None = None) -> dict[str, Any]:
     if not WEB_LINK.match(link):
         # Refused before any tool runs: a "link" such as "--exec=..." would be read as an option.
-        return {"status": "error", "reason": "not a web link", "link": link, "work": None}
+        return refused(link, "not a web link")
+    access = LOGGED_OUT
+    if login is not None:
+        named = login_access(login)
+        if named is None:
+            return refused(link, "--login takes a browser that both yt-dlp and gallery-dl read, such as firefox "
+                                 "or chrome:Profile 1, with a profile of letters, digits, spaces, dots, dashes "
+                                 "and underscores")
+        # yt-dlp loads every cookie of the browser, so a share or redirect link that led to another
+        # site would read it with the user's login there: only a post's own link, read as canonical.
+        post = parse_link(link)
+        if post.get("platform") != "instagram" or not post.get("id"):
+            return refused(link, "login reads are for an Instagram post's own link, with /p/, /reel/ or /tv/ "
+                                 "in its path")
+        link, access = post["link"], named
     folder = new_work_folder()
+    if access.login:
+        keep_cookie_copies_in(folder)
     try:
-        return read_post(link, folder, language)
+        return read_post(link, folder, language, access)
     except FileNotFoundError as missing:
         return not_ok(link, folder, f"{missing.filename or missing_tools()} is not installed")
     except subprocess.CalledProcessError as broken:
@@ -290,33 +384,38 @@ def read(link: str, language: str | None = None) -> dict[str, Any]:
         return not_ok(link, folder, f"{type(unexpected).__name__}: {unexpected}")
 
 
-def read_post(link: str, folder: Path, language: str | None) -> dict[str, Any]:
-    downloaded = download(link, folder)
-    if downloaded.returncode != 0 and "http error 403" in last_error(downloaded.stderr).lower():
-        # Sites often break older yt-dlp releases: update once, then retry once.
+def read_post(link: str, folder: Path, language: str | None, access: Access) -> dict[str, Any]:
+    downloaded = download(link, folder, access)
+    # Sites often break older yt-dlp releases: update once, then retry once. Not on a login read,
+    # where a 403 may be Instagram refusing the account: a second try would use the account again.
+    if (downloaded.returncode != 0 and not access.login
+            and "http error 403" in last_error(downloaded.stderr).lower()):
         try:  # the update is optional: without uv, or with uv blocked, the retry still runs
             subprocess.run(["uv", "tool", "upgrade", "yt-dlp"], capture_output=True, timeout=time_limit("uv"))
         except (OSError, subprocess.TimeoutExpired):
             pass
-        downloaded = download(link, folder)
+        downloaded = download(link, folder, access)
     if downloaded.returncode != 0:
         if matches(last_error(downloaded.stderr), NO_VIDEO):
-            return read_photos(link, folder)
-        return not_ok(link, folder, downloaded.stderr)
+            return read_photos(link, folder, access, language)
+        result = failed(link, folder, downloaded.stderr, access)
+        if access.login and result["status"] == "login_only":
+            return read_gated(link, folder, language, access, downloaded.stderr)
+        return result
     info = json.loads(downloaded.stdout)
     if info.get("_type") in ("playlist", "multi_video"):
-        return read_photos(info.get("webpage_url") or link, folder)
-    return read_video(link, info, folder, language)
+        return read_photos(info.get("webpage_url") or link, folder, access, language)
+    return read_video(link, info, folder, language, access)
 
 
-def read_video(link: str, info: dict[str, Any], folder: Path, hint: str | None) -> dict[str, Any]:
+def read_video(link: str, info: dict[str, Any], folder: Path, hint: str | None, access: Access) -> dict[str, Any]:
     canonical = parse_link(info.get("webpage_url") or link)
     media = Path(info["requested_downloads"][0]["filepath"])
     transcript, source, language = None, "none", None
     track = caption_track(info)
     if track:
         key, source = track
-        transcript, language = captions(info["webpage_url"], key, source, folder), info["language"]
+        transcript, language = captions(info["webpage_url"], key, source, folder, access), info["language"]
     elif has_audio(media):
         transcript, language, source = transcribe(media, folder / "transcript", hint or info.get("language"))
     frames = keyframes(media, folder / "frames")
@@ -332,7 +431,7 @@ def read_video(link: str, info: dict[str, Any], folder: Path, hint: str | None) 
     )
 
 
-def read_photos(link: str, folder: Path) -> dict[str, Any]:
+def read_photos(link: str, folder: Path, access: Access, language: str | None = None) -> dict[str, Any]:
     """Photo posts and carousels: yt-dlp downloads no video, but saves each slide's image.
 
     gallery-dl reads the posts yt-dlp returns no images for. Checked without a login
@@ -341,13 +440,16 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
     images_dir = folder / "images"
     asked = run(
         # --no-simulate: without it, --dump-single-json writes no files at all.
-        ["yt-dlp", *YT_DLP, "--ignore-no-formats-error", "--skip-download", "--no-simulate",
-         "--dump-single-json", "--no-warnings", "--write-thumbnail", "--convert-thumbnails", "jpg",
+        ["yt-dlp", *access.yt_dlp, "--ignore-no-formats-error", "--skip-download", "--no-simulate",
+         "--dump-single-json", *access.quiet, "--write-thumbnail", "--convert-thumbnails", "jpg",
          "-o", str(images_dir / "%(playlist_index)02d.%(ext)s"), "--", link],
         capture_output=True, text=True,
     )
     if asked.returncode != 0 and matches(last_error(asked.stderr), LOGIN_ONLY + NEEDS_LOGIN):
-        return not_ok(link, folder, asked.stderr)  # gallery-dl would only meet Instagram's login page
+        result = failed(link, folder, asked.stderr, access)
+        if access.login and result["status"] == "login_only":
+            return read_gated(link, folder, language, access, asked.stderr)
+        return result  # logged out, gallery-dl would only meet Instagram's login page
     info: dict[str, Any] = json.loads(asked.stdout) if asked.returncode == 0 and asked.stdout.strip() else {}
     images = images_in(images_dir)
     if images:
@@ -355,11 +457,11 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
         return photos(canonical, folder, images, author_of(info, canonical["platform"]),
                       info.get("description") or "")
     fetched = run(
-        ["gallery-dl", "--config-ignore", "--http-timeout", NETWORK_TIMEOUT, "--write-metadata", "-D", str(images_dir), "--", link],
+        ["gallery-dl", *access.gallery_dl, "--write-metadata", "-D", str(images_dir), "--", link],
         capture_output=True, text=True,
     )
     if fetched.returncode != 0:
-        return not_ok(link, folder, fetched.stderr)
+        return failed(link, folder, fetched.stderr, access)
     images = images_in(images_dir)
     if not images:
         return not_ok(link, folder, "no images found in the post")
@@ -368,6 +470,51 @@ def read_photos(link: str, folder: Path) -> dict[str, Any]:
     return photos(parse_link(info.get("webpage_url") or link), folder, images,
                   first_text(metadata, "username", "uploader", "author", "user"),
                   first_text(metadata, "description", "desc", "content", "caption") or "")
+
+
+def read_gated(link: str, folder: Path, hint: str | None, access: Access, gated: str) -> dict[str, Any]:
+    """A login read that yt-dlp still found hidden: gallery-dl reads the post with the same cookies.
+
+    With a signed-in Chrome session, yt-dlp got an empty media response for an age-limited post
+    that the account sees in the browser, and gallery-dl read it (checked 2026-11-16). gallery-dl
+    is asked for the merged video file: for a DASH video it would otherwise call yt-dlp's module,
+    which its own install lacks. With no media, the post stays login_only.
+    """
+    media_dir = folder / "gallery"
+    fetched = run(
+        ["gallery-dl", *access.gallery_dl, "-o", "extractor.instagram.videos=merged", "--write-metadata",
+         "-D", str(media_dir), "--", link],
+        capture_output=True, text=True,
+    )
+    if fetched.returncode != 0:
+        return failed(link, folder, fetched.stderr, access)
+    videos = sorted(f for f in media_dir.glob("*") if f.suffix.lower() in VIDEO_TYPES) if media_dir.is_dir() else []
+    images = images_in(media_dir)
+    if not videos and not images:  # login_only, or error after gallery-dl's own cookie warning
+        return failed(link, folder, f"{fetched.stderr}\n{gated}", access)
+    first = videos[0] if videos else images[0]
+    metadata_file = Path(f"{first}.json")
+    metadata: dict[str, Any] = json.loads(metadata_file.read_text(encoding="utf-8")) if metadata_file.exists() else {}
+    canonical = parse_link(link)
+    author = first_text(metadata, "username", "uploader", "author", "user")
+    caption = first_text(metadata, "description", "desc", "content", "caption") or ""
+    if not videos:
+        return photos(canonical, folder, images, author, caption)
+    media = videos[0]
+    transcript, language, source = None, None, "none"
+    if has_audio(media):
+        transcript, language, source = transcribe(media, folder / "transcript", hint)
+    frames = keyframes(media, folder / "frames")
+    return ok(
+        canonical, folder, "video", frames, thumbnail(folder / "media.jpg", frames, folder / "thumbnail.jpg"),
+        author=author,
+        title=None,
+        caption=caption,
+        duration=None,
+        transcript=transcript,
+        transcript_source=source,
+        transcript_language=language,
+    )
 
 
 def images_in(folder: Path) -> list[Path]:
@@ -481,11 +628,11 @@ def caption_track(info: dict[str, Any]) -> tuple[str, str] | None:
     return None
 
 
-def captions(link: str, track: str, source: str, folder: Path) -> str:
+def captions(link: str, track: str, source: str, folder: Path, access: Access) -> str:
     which = "--write-subs" if source == "captions" else "--write-auto-subs"
     run(
-        ["yt-dlp", *YT_DLP, "--skip-download", which, "--sub-langs", track, "--sub-format", "vtt",
-         "--no-warnings", "-o", str(folder / "subs.%(ext)s"), "--", link],
+        ["yt-dlp", *access.yt_dlp, "--skip-download", which, "--sub-langs", track, "--sub-format", "vtt",
+         *access.quiet, "-o", str(folder / "subs.%(ext)s"), "--", link],
         capture_output=True, text=True, check=True,
     )
     # yt-dlp writes UTF-8; without the encoding, Windows would read it as its own code page.
@@ -506,35 +653,50 @@ def vtt_text(vtt: str) -> str:
     return " ".join(lines)
 
 
-def download(link: str, folder: Path) -> subprocess.CompletedProcess[str]:
+def download(link: str, folder: Path, access: Access) -> subprocess.CompletedProcess[str]:
     return run(
-        ["yt-dlp", *YT_DLP, "--no-simulate", "--dump-single-json", "--no-warnings", "--no-progress",
+        ["yt-dlp", *access.yt_dlp, "--no-simulate", "--dump-single-json", *access.quiet, "--no-progress",
          "-f", AT_MOST_720P, "--write-thumbnail", "--convert-thumbnails", "jpg", "--playlist-items", "1",
          "-o", str(folder / "media.%(ext)s"), "--", link],
         capture_output=True, text=True,
     )
 
 
-def not_ok(link: str, folder: Path, tool_output: str) -> dict[str, Any]:
-    """The result for a post that could not be read: login_only, needs_login, unavailable or error."""
+def failed(link: str, folder: Path, tool_output: str, access: Access) -> dict[str, Any]:
+    """not_ok for a tool that failed, except that on a login read, a gated post or a login page
+    after a cookie warning is an error with that warning as its reason: the login was never used."""
+    if access.login and status_of(last_error(tool_output)) in ("login_only", "needs_login"):
+        warnings = [line.strip() for line in tool_output.splitlines() if COOKIE_WARNING.search(line.strip())]
+        if warnings:
+            return not_ok(link, folder, warnings[-1], status="error")
+    return not_ok(link, folder, tool_output)
+
+
+def not_ok(link: str, folder: Path, tool_output: str, status: str | None = None) -> dict[str, Any]:
+    """The result for a post that could not be read: login_only, needs_login, unavailable or error.
+
+    The status comes from the tool's last error line, unless the caller already knows it.
+    """
     reason = last_error(tool_output)
-    if matches(reason, LOGIN_ONLY):
-        status = "login_only"
-    elif matches(reason, NEEDS_LOGIN):
-        status = "needs_login"
-    elif matches(reason, UNAVAILABLE):
-        status = "unavailable"
-    else:
-        status = "error"
     canonical = parse_link(link)
     return {
-        "status": status,
+        "status": status or status_of(reason),
         "reason": reason,
         "platform": canonical.get("platform"),
         "link": canonical.get("link", link),
         "id": canonical.get("id"),
         "work": str(folder),
     }
+
+
+def status_of(reason: str) -> str:
+    if matches(reason, LOGIN_ONLY):
+        return "login_only"
+    if matches(reason, NEEDS_LOGIN):
+        return "needs_login"
+    if matches(reason, UNAVAILABLE):
+        return "unavailable"
+    return "error"
 
 
 def last_error(tool_output: str) -> str:
@@ -669,10 +831,11 @@ def new_work_folder() -> Path:
     return folder.resolve()
 
 
-def pause() -> dict[str, float]:
-    """Wait a random PAUSE. A shell sleep with $RANDOM, or python3 -c, needs approval where only
-    the skill's own scripts may run. GK_PAUSE_SCALE shortens the wait (for the tests)."""
-    seconds = random.uniform(*PAUSE)
+def pause(login: bool = False) -> dict[str, float]:
+    """Wait a random PAUSE, or LOGIN_PAUSE before a login read. A shell sleep with $RANDOM, or
+    python3 -c, needs approval where only the skill's own scripts may run. GK_PAUSE_SCALE shortens
+    the wait (for the tests)."""
+    seconds = random.uniform(*(LOGIN_PAUSE if login else PAUSE))
     time.sleep(seconds * float(os.environ.get("GK_PAUSE_SCALE", "1")))
     return {"paused": round(seconds, 1)}
 
@@ -683,15 +846,19 @@ def main() -> None:
     read_parser = commands.add_parser("read")
     read_parser.add_argument("link", nargs="?", help="the Entry's Link; read from stdin when left out")
     read_parser.add_argument("--language", help="the spoken language when known, such as it")
+    read_parser.add_argument("--login", metavar="BROWSER",
+                             help="read an Instagram post with this browser's login, such as firefox or "
+                                  "'chrome:Profile 1'")
     commands.add_parser("check")
-    commands.add_parser("pause")
+    pause_parser = commands.add_parser("pause")
+    pause_parser.add_argument("--login", action="store_true", help="the longer pause before a login read")
     clean_parser = commands.add_parser("clean")
     clean_parser.add_argument("folder", type=Path)
     args = parser.parse_args()
     if args.command == "check":
         print(json.dumps(check()))
     elif args.command == "pause":
-        print(json.dumps(pause()))
+        print(json.dumps(pause(args.login)))
     elif args.command == "clean":
         result = clean(args.folder)
         print(json.dumps(result))
@@ -699,7 +866,7 @@ def main() -> None:
             sys.exit(2)
     else:
         link = args.link if args.link is not None else sys.stdin.read().strip()
-        print(json.dumps(read(link, args.language)))
+        print(json.dumps(read(link, args.language, args.login)))
 
 
 if __name__ == "__main__":
