@@ -185,6 +185,20 @@
         "The truncated-link Entry's Status is still the Library's label for Inbox",
         "Its Note still starts with (1/3)"
       ]
+    },
+    {
+      "id": 17,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed: an Inbox Entry for a public recipe post, a Preferences row 'ask me' for that recipe Category and a grocery list, 'Ping by' set to none, and 'Open offers' holding one line from 3 days ago with number 2 and one from 9 days ago with number 1. The run finishes the Entry, numbers its offer 3, and saves it in Open offers. Then a fresh chat on the same Library answers it.",
+      "files": [],
+      "expectations": [
+        "The recipe Entry is Processed",
+        "The final message offers the grocery list as number 3, with a link to the Entry",
+        "'Open offers' in the Settings holds the line numbered 2 and a new line numbered 3, with today's date, the kind, the offer and the Entry's link, separated by ' · '. The line from 9 days ago is gone",
+        "In a fresh session started with `run_evals.py <app> prompt <run> \"Graveyard Killer, sì alla 3\"`, the grocery list is in the chat, and line 3 is gone from Open offers",
+        "In another fresh session, \"Graveyard Killer, sì alla 3\" says that the offer was already answered or has expired, and does nothing else",
+        "In another fresh session, \"Graveyard Killer, cosa mi hai proposto?\" lists offer 2 with its number"
+      ]
     }
   ]
 }

@@ -77,7 +77,7 @@ Read the `Settings` tab with `get_values`, as `'Settings'!A:D`.
 
 Find the cell by reading the `Settings` tab. Write every Settings value as text, dates too, such as `2026-11-10`.
 
-- **A value:** `updateCells` on its cell.
+- **A value:** `updateCells` on its cell. A value with several lines, such as "Open offers", stays in one cell, with a line break (`\n`) between its lines.
 - **A new row in a table,** such as a Preference: in one `update_spreadsheet` call, insert one row just below the table's last row, then write into it. When `get_values` shows that last row as row r, that is `insertDimension` with `startIndex` r, `endIndex` r + 1 and `inheritFromBefore`, then `updateCells` at `rowIndex` r.
 - **A missing section:** insert its heading row, its value or table, and a blank row, where library.md's order puts it.
 

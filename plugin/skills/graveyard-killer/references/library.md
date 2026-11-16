@@ -134,6 +134,7 @@ Ogni giorno 13:00
 | Ping by | push |
 | Last Ping | 2026-11-10 |
 | Last Digest | 2026-11-03 |
+| Open offers | 4 · 2026-11-10 · Ricette · lista della spesa · La lista della spesa per la carbonara · https://app.notion.com/p/418f4b208c40812fb8e0c2a4d1e5f6a7 |
 
 ## Preferences
 | Kind | Answer |
@@ -151,11 +152,11 @@ Ogni giorno 13:00
 - **Categories.** Exactly one is the fallback. The Category field's choices are the Category names from this table.
 - **Schedule.** When the Worker runs, in local time: every day by default, or the weekdays the user chose.
 - **Limits.** How many posts the Worker may download, counted from the Processed dates ([worker.md](worker.md#steps), step 2).
-- **Pings.** "Ping by" is how a Ping reaches the user: `push`, `email` or `none`. A Library from 0.4.0 may hold `notion`, which never notified the user: treat it as `none` ([ping.md](ping.md#send-it)). "Last Ping" and "Last Digest" are dates, or empty.
+- **Pings.** "Ping by" is how a Ping reaches the user: `push`, `email` or `none`. A Library from 0.4.0 may hold `notion`, which never notified the user: treat it as `none` ([ping.md](ping.md#send-it)). "Last Ping" and "Last Digest" are dates, or empty. "Open offers" holds the numbered offers of the last 7 days' Pings that the user has not answered yet, one per line: the number, the Ping's date, the kind, the offer in a few words and the link to its Entry, separated by " · ". It is empty when none is open ([ping.md](ping.md#send-it)).
 - **Preferences.** One row per kind of Proposal: its Category and action, and the user's answer (always, ask me or never, in the Settings language). It starts empty ([ping.md](ping.md)).
 - **Graveyard.** "Dig up next" is a Category the user asked to see first, or empty. "Last import" is the date of the last Graveyard import, or empty.
 
-A new Library starts with the Limits above and every other new setting empty. A Library made before version 0.4.0 may lack a section, or still hold "Dig up per run", which the Limits replace. Use the defaults for a missing section, and add the section, in the order shown above, the first time you write to it.
+A new Library starts with the Limits above and every other new setting empty. A Library made before version 0.4.0 may lack a section, or still hold "Dig up per run", which the Limits replace. Use the defaults for a missing section, and add the section, in the order shown above, the first time you write to it. A Library made before version 0.7.0 lacks the "Open offers" row: treat it as empty, and add the row the first time you write to the Pings section.
 
 ## Operations
 

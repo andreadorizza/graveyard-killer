@@ -31,7 +31,7 @@ You came here from the `graveyard-killer-worker` skill, or from Setup or Recall 
 
 7. **Gather the Ping,** as [ping.md](ping.md#gather-it) says. Done when you hold its Proposals, its fixes and, when due, its Digest, or know that nothing needs the user.
 
-8. **Send the Ping, or end quietly,** as [ping.md](ping.md#send-it) says. Done when the Ping is sent, or the run has ended with its one-line summary.
+8. **Send the Ping, or end quietly,** as [ping.md](ping.md#send-it) says. Read that section again now, since the run is long by now, and do its steps in order. Done when the Ping is sent, or the run has ended with its one-line summary.
 
 When the user answers in this chat, later or at once, act as [ping.md](ping.md#when-the-user-answers) says.
 

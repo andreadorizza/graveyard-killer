@@ -48,7 +48,7 @@ Read the `Settings` page inside the Library.
 
 ### Write the Settings
 
-Edit the `Settings` page: change the value under a section's heading, or add or update a row in its table.
+Edit the `Settings` page: change the value under a section's heading, or add or update a row in its table. A value with several lines, such as "Open offers", stays in one table cell, with `<br />` between its lines.
 
 ### Find an Entry by its link
 
