@@ -26,6 +26,7 @@ The shared saves are the rows in Entries with a link and no Status: Notion's sha
 ## Writing to Notion
 
 - **Markdown.** The connector reads text values as Markdown. In text that comes from the post, such as Caption, Author and transcripts, put a backslash before `*`, `_`, `` ` ``, `[` and `]`, so the text stays as the creator wrote it.
+- **Bare addresses.** Notion turns a bare domain or file name into a link: `benji.org/stageshow` becomes `http://benji.org/stageshow`, and `brand-guidelines.zip` becomes `http://brand-guidelines.zip`. A backslash does not stop it, and inline code does. So in text that comes from the post, put each word with no spaces in which a dot is followed by letters, such as a domain, a path or a file name, between backticks, with no backslashes inside them. Leave a link that starts with `http://` or `https://` as it is. (Tested on 2026-11-16.)
 - **Tags.** Before an Entry uses a new Tag, [add it](#add-a-tag) to the Tag property's options.
 - **Long text.** One text value or page-body block holds at most 2,000 characters. Split longer text into blocks, between sentences. For a caption longer than 2,000 characters, put its start in Caption and the full text in the page body.
 - **Links.** Write and save links without a query string, such as the `?pvs=…` that Notion adds.
