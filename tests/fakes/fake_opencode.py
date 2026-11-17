@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Stand-in for `opencode run` in the schedule script's tests.
 
-Each call appends its argv, its stdin, its working folder, OPENCODE_DISABLE_CLAUDE_CODE, PATH,
-TMPDIR and PWD to the log in $GK_FAKE_OPENCODE_LOG, then plays the next response from the list in
-$GK_FAKE_OPENCODE_SCENARIO: {"events": [...], "exit": 0, "sleep": 0}. Events are printed as
+Each call appends its argv, its stdin, its working folder, OPENCODE_DISABLE_CLAUDE_CODE,
+OPENCODE_DISABLE_EXTERNAL_SKILLS, PATH, TMPDIR and PWD to the log in $GK_FAKE_OPENCODE_LOG, then
+plays the next response from the list in $GK_FAKE_OPENCODE_SCENARIO: {"events": [...], "exit": 0, "sleep": 0}. Events are printed as
 JSON lines, as `opencode run --format json` prints them; a string is printed as it is.
 """
 
@@ -23,6 +23,7 @@ with log.open("a", encoding="utf-8") as f:
         "stdin": sys.stdin.read(),
         "cwd": os.getcwd(),
         "disable_claude_code": os.environ.get("OPENCODE_DISABLE_CLAUDE_CODE"),
+        "disable_external_skills": os.environ.get("OPENCODE_DISABLE_EXTERNAL_SKILLS"),
         "path": os.environ.get("PATH"),
         "tmpdir": os.environ.get("TMPDIR"),
         "pwd": os.environ.get("PWD"),

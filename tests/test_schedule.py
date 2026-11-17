@@ -452,6 +452,7 @@ def test_a_run_gives_opencode_the_whole_prompt_and_logs_the_ping(
     assert "Graveyard Killer Library: https://app.notion.com/p/41af4b208c4081c2?v=1&x=$HOME\n" in call["argv"][-1]
     assert Path(call["cwd"]).resolve() == folder
     assert call["disable_claude_code"] == "1"
+    assert call["disable_external_skills"] == "1"  # a copy in ~/.agents/skills would shadow this one
     assert call["tmpdir"] == tempfile.gettempdir()  # where opencode.json lets the Worker read
     assert alerts == []
     log = (folder / "worker.log").read_text()

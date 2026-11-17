@@ -1017,7 +1017,10 @@ def alert(job: Job, reason: str) -> None:
 def run(folder: Path) -> Outcome:
     folder = folder.resolve()
     job = load_job(folder)
-    env = {**os.environ, "OPENCODE_DISABLE_CLAUDE_CODE": "1"}  # ~/.claude stays out of the run
+    # ~/.claude stays out of the run. So do ~/.claude/skills and ~/.agents/skills: a copy of the skills
+    # there, such as the one Codex reads, shadows the one in ~/.config/opencode/skills, and opencode.json
+    # lets the run read only the copy this script sits in (OpenCode 1.19.5, 2026-11-17).
+    env = {**os.environ, "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1"}
     if job.path:
         env["PATH"] = job.path
     env["TMPDIR"] = job.temp  # post.py's work folders go where opencode.json lets the Worker read
