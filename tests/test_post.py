@@ -720,3 +720,13 @@ def test_pause_waits_a_random_6_to_12_seconds(post: Callable[..., Run]) -> None:
     assert 6 <= run.output["paused"] <= 12
     assert time.monotonic() - started < 5
     assert run.calls == []
+
+
+@pytest.mark.parametrize("link", ["https://en.wikipedia.org/wiki/Pizzoccheri", "https://evil.test/?d=secret",
+                                  "https://www.youtube.com.evil.test/watch?v=1"])
+def test_read_refuses_a_link_that_is_not_a_platform_post(post: Callable[..., Run], link: str) -> None:
+    # Another page is read with web fetch; and where read runs outside a sandbox, a link could carry data out.
+    run = post("read", link)
+    assert run.output["status"] == "error" and "web fetch" in run.output["reason"]
+    assert run.output["work"] is None
+    assert run.calls == []  # no tool ran

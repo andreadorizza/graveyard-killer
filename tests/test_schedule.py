@@ -633,8 +633,9 @@ def test_codex_writes_the_run_folder_and_trusts_it(
     assert out["prompt"].endswith(f"Graveyard Killer Library: {LIBRARY}\n")
     assert "never start it again while it runs" in out["prompt"]
     assert (out["model"], out["effort"]) == (schedule.CODEX_MODEL, "high")
-    settings = json.loads((folder / "codex.json").read_text())
-    assert (settings["library"], settings["codex"]) == (LIBRARY, ["/opt/bin/codex"])
+    # Data only, in .codex/, which a scheduled task's default permissions keep read-only.
+    settings = json.loads((folder / ".codex/graveyard-killer.json").read_text())
+    assert settings == {"library": LIBRARY, "alert": schedule.DEFAULT_ALERT}
     for written in (".codex/config.toml", ".codex/rules/graveyard-killer.rules", "AGENTS.md"):
         assert str(folder / written) in out["written"]
     assert (folder / "work").is_dir()
@@ -680,8 +681,8 @@ def test_the_codex_rules_let_out_only_the_skill_s_scripts_by_full_path(
     scripts, task = [json.loads(found) for found in re.findall(r"pattern = (\[.*\]),\n", rules)]
     assert scripts[0][:2] == ["python3", "python"]
     assert scripts[1] == [str(SCRIPTS.resolve() / "post.py"), str(SCRIPTS.resolve() / "link.py")]
-    # schedule.py gets out only for codex-run: never install, remove or another command.
-    assert task[1:] == [str(SCRIPTS.resolve() / "schedule.py"), "codex-run"]
+    # schedule.py gets out only for codex-run in this run folder: never another command or folder.
+    assert task[1:] == [str(SCRIPTS.resolve() / "schedule.py"), "codex-run", "--folder", str(folder.resolve())]
     assert rules.count('decision = "allow"') == 2
     assert "scripts/post.py\"" not in rules.replace(str(SCRIPTS.resolve()), "")  # no relative call
 
@@ -750,7 +751,8 @@ def codex_run(
     log, scenario_file = tmp_path / "codex.jsonl", tmp_path / "scenario.json"
     monkeypatch.setenv("GK_FAKE_OPENCODE_LOG", str(log))
     monkeypatch.setenv("GK_FAKE_OPENCODE_SCENARIO", str(scenario_file))
-    schedule.prepare_codex_folder(folder, LIBRARY, codex=[sys.executable, str(FAKE_OPENCODE)], alert="Riordino fallito.")
+    monkeypatch.setattr(schedule, "find_codex", lambda: [sys.executable, str(FAKE_OPENCODE)])
+    schedule.prepare_codex_folder(folder, LIBRARY, alert="Riordino fallito.")
     capsys.readouterr()
 
     def go(responses: list[dict[str, Any]]) -> tuple[schedule.Outcome, list[dict[str, Any]], str]:
@@ -779,7 +781,12 @@ def test_codex_run_runs_the_worker_in_the_folder_and_prints_the_ping(
     assert outcome.ok and outcome.session == "th_1"
     assert printed == ping + "\n"
     [call] = calls
-    assert call["argv"] == ["exec", "--json", "--skip-git-repo-check", schedule.PROMPT.format(library=LIBRARY)]
+    assert call["argv"][:3] == ["exec", "--json", "--skip-git-repo-check"]
+    assert call["argv"][-1] == schedule.PROMPT.format(library=LIBRARY)
+    # The unattended run gets only the Notion tools a Worker needs: nothing that deletes or moves.
+    [tools] = [value for value in call["argv"] if value.startswith("mcp_servers.notion.enabled_tools=")]
+    enabled = json.loads(tools.split("=", 1)[1])
+    assert "notion-update-page" in enabled and not [x for x in enabled if "delete" in x or "move" in x]
     assert Path(call["cwd"]).resolve() == folder and call["pwd"] == str(folder)
     log = (folder / "worker.log").read_text()
     assert "  tool     command python3 post.py read 'x'\n" in log
@@ -845,3 +852,13 @@ def test_codex_run_cleans_the_work_folders_a_run_left(
     assert not left.exists()
     assert other.exists()  # no marker: not post.py's, so it stays
     assert "graveyard-killer-7izjlt6s, left by the run" in (folder / "worker.log").read_text()
+
+
+def test_codex_run_starts_no_program_named_in_the_run_folder(
+    codex_run: Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]], folder: Path
+) -> None:
+    """A scheduled task may write the run folder: what codex-run starts never comes from there."""
+    (folder / "codex.json").write_text(json.dumps({"library": LIBRARY, "codex": ["/tmp/evil"], "path": "/tmp"}))
+    outcome, calls, _ = codex_run([{"events": codex_events("Fatto.")}])
+    assert outcome.ok and len(calls) == 1
+    assert "/tmp" not in (calls[0]["path"] or "").split(os.pathsep)[:1]

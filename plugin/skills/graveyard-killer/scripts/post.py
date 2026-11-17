@@ -40,6 +40,7 @@ from link import parse as parse_link
 T = TypeVar("T")
 
 MARKER = ".graveyard-killer-work"
+PLATFORMS = ("instagram", "tiktok", "youtube")  # the only links read downloads
 WEB_LINK = re.compile(r"^https?://\S+$", re.IGNORECASE)
 # No config file, so no cookies or login a user may have set up for yt-dlp elsewhere.
 ANONYMOUS = ("--ignore-config", "--no-cookies")
@@ -275,6 +276,11 @@ def read(link: str, language: str | None = None) -> dict[str, Any]:
     if not WEB_LINK.match(link):
         # Refused before any tool runs: a "link" such as "--exec=..." would be read as an option.
         return {"status": "error", "reason": "not a web link", "link": link, "work": None}
+    if parse_link(link).get("platform") not in PLATFORMS:
+        # Refused before any tool runs. The Worker reads another page with its web fetch tool, and
+        # where read runs outside an agent's sandbox (Codex) any other link could carry data out.
+        return {"status": "error", "reason": "not an Instagram, TikTok or YouTube link: read the page with your "
+                "web fetch tool", "link": link, "work": None}
     folder = new_work_folder()
     try:
         return read_post(link, folder, language)

@@ -255,7 +255,14 @@ CODEX_RULES = "graveyard-killer.rules"
 CODEX_MODEL = "gpt-6-luna"  # on every plan with Codex, Free included (pricing page, 2026-11-17)
 CODEX_EFFORT = "high"
 CODEX_WORK = "work"  # post.py's work folders: inside the run folder, which the sandbox may read
-CODEX_SETTINGS = "codex.json"  # the Library, the codex command and the failure alert, for codex-run
+# The Library and the failure alert, for codex-run. In .codex/, which a scheduled task's default
+# permissions keep read-only even where they let it write the run folder (2026-11-17).
+CODEX_SETTINGS = ".codex/graveyard-killer.json"
+# The Notion tools the unattended Worker run may use; deleting, moving or sharing is never one of
+# them. The task's chat, where the user answers the Ping, keeps Notion's other tools.
+CODEX_NOTION_TOOLS = ("notion-search", "notion-fetch", "notion-query-data-sources", "notion-create-pages",
+                      "notion-update-page", "notion-update-data-source", "notion-create-view",
+                      "notion-update-view", "notion-get-async-task")
 CODEX_LOCK = ".worker-run.lock"  # one codex-run at a time in a run folder
 # The ChatGPT desktop app's own codex, when none is on PATH (macOS, app 26.1111).
 CODEX_APP_CLI = Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex")
@@ -346,7 +353,7 @@ def codex_config(folder: Path, skills: Path) -> str:
     )
 
 
-def codex_rules(skills: Path) -> str:
+def codex_rules(skills: Path, folder: Path) -> str:
     """The rules that let the skill's scripts, and only them, run outside the sandbox.
 
     Codex splits a plain `a && b` or `a | b` into its commands and checks each one, so a script
@@ -365,7 +372,8 @@ def codex_rules(skills: Path) -> str:
         ")\n"
         "# The scheduled task's one command: it starts the Worker run in this folder's sandbox.\n"
         "prefix_rule(\n"
-        f"    pattern = [{json.dumps(pythons)}, {json.dumps(schedule, ensure_ascii=False)}, \"codex-run\"],\n"
+        f"    pattern = [{json.dumps(pythons)}, {json.dumps(schedule, ensure_ascii=False)}, \"codex-run\", \"--folder\", "
+        f"{json.dumps(str(folder), ensure_ascii=False)}],\n"
         '    decision = "allow",\n'
         '    justification = "Graveyard Killer\'s scheduled Worker run",\n'
         ")\n"
@@ -410,7 +418,7 @@ def codex_task_command(folder: Path, skills: Path) -> str:
     return f"{python} {shell_word(str(schedule))} codex-run --folder {shell_word(str(folder))}"
 
 
-def prepare_codex_folder(folder: Path, library: str, skills: Path | None = None, codex: list[str] | None = None,
+def prepare_codex_folder(folder: Path, library: str, skills: Path | None = None,
                          alert: str = DEFAULT_ALERT) -> list[str]:
     """Write the run folder for Codex, for the skills in `skills`, this script's own by default.
     Returns what was written."""
@@ -419,13 +427,14 @@ def prepare_codex_folder(folder: Path, library: str, skills: Path | None = None,
     dot_codex = folder / ".codex"
     (dot_codex / "rules").mkdir(parents=True, exist_ok=True)
     (folder / CODEX_WORK).mkdir(exist_ok=True)
-    settings = {"library": library, "codex": codex or find_codex() or ["codex"], "alert": alert,
-                "python": sys.executable, "path": os.environ.get("PATH", "")}
+    # Data only: codex-run finds codex and Python itself, so nothing here names a program to start.
+    settings = {"library": library, "alert": alert}
     (folder / CODEX_SETTINGS).write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (folder / "codex.json").unlink(missing_ok=True)  # where an earlier version kept them
     written = [str(folder / CODEX_SETTINGS)]
     # Always rewritten: they name this folder and these scripts.
     for path, text in ((dot_codex / "config.toml", codex_config(folder, skills)),
-                       (dot_codex / "rules" / CODEX_RULES, codex_rules(skills))):
+                       (dot_codex / "rules" / CODEX_RULES, codex_rules(skills, folder))):
         path.write_text(text, encoding="utf-8")
         written.append(str(path))
     agents = folder / "AGENTS.md"
@@ -452,7 +461,7 @@ def codex(args: argparse.Namespace) -> dict[str, Any]:
         raise Refused("Codex's command, codex, is not on PATH and the ChatGPT app is not where it bundles one: "
                       "install Codex's command-line tool, from https://learn.chatgpt.com/docs/codex/cli.")
     folder = Path(args.folder).expanduser().resolve()
-    written = prepare_codex_folder(folder, args.library, codex=command, alert=args.alert)
+    written = prepare_codex_folder(folder, args.library, alert=args.alert)
     return {"folder": str(folder), "written": written, "model": CODEX_MODEL, "effort": CODEX_EFFORT,
             "prompt": CODEX_TASK_PROMPT.format(command=codex_task_command(folder, skills_folder()),
                                                library=args.library)}
@@ -1007,13 +1016,17 @@ def describe_codex_item(item: dict[str, Any]) -> str:
     return str(kind)
 
 
-def run_codex_worker(folder: Path, settings: dict[str, Any], log: Log) -> Outcome:
+def codex_exec_options() -> list[str]:
+    """What every unattended Worker run in Codex adds: only the Notion tools it needs."""
+    return ["-c", f"mcp_servers.notion.enabled_tools={json.dumps(list(CODEX_NOTION_TOOLS))}"]
+
+
+def run_codex_worker(folder: Path, settings: dict[str, Any], log: Log, codex: list[str]) -> Outcome:
     """`codex exec` in the run folder, so the folder's permission profile and rules hold."""
-    command = [*settings["codex"], "exec", "--json", "--skip-git-repo-check", PROMPT.format(library=settings["library"])]
+    command = [*codex, "exec", "--json", "--skip-git-repo-check", *codex_exec_options(),
+               PROMPT.format(library=settings["library"])]
     log.write("start", f"codex exec in {folder}")
     env = {**os.environ, "PWD": str(folder)}
-    if settings.get("path"):  # PATH at setup: an app's own PATH may lack Homebrew and ~/.local/bin
-        env["PATH"] = settings["path"]
     try:
         process = subprocess.Popen(
             command, cwd=folder, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -1101,6 +1114,10 @@ def codex_run(folder: Path) -> Outcome:
     the Ping, or one line saying why the run failed, for the task's chat to give the user."""
     folder = folder.resolve()
     settings = json.loads((folder / CODEX_SETTINGS).read_text(encoding="utf-8"))
+    codex = find_codex()
+    if not codex:
+        print("Codex's command, codex, is not on PATH: Graveyard Killer cannot run.")
+        return Outcome(False, "codex is not on PATH")
     try:
         lock = take_lock(folder)
     except RunGoing as going:
@@ -1109,7 +1126,7 @@ def codex_run(folder: Path) -> Outcome:
     log = Log(folder)
     started = datetime.now().isoformat(timespec="seconds")
     try:
-        outcome = run_codex_worker(folder, settings, log)
+        outcome = run_codex_worker(folder, settings, log, codex)
         for left in clean_work_folders(folder):
             log.write("cleaned", f"{left}, left by the run")
     finally:
@@ -1126,7 +1143,7 @@ def codex_run(folder: Path) -> Outcome:
     print(message)
     # The task's chat relays the line, but the app sees a task that worked: say it on the desktop too.
     post = str(Path(__file__).resolve().with_name("post.py"))
-    subprocess.run([settings.get("python") or sys.executable, post, "notify"], input=f"Graveyard Killer\n{message}\n",
+    subprocess.run([sys.executable, post, "notify"], input=f"Graveyard Killer\n{message}\n",
                    capture_output=True, text=True)
     return outcome
 

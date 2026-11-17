@@ -434,7 +434,8 @@ def codex_prepare(model: str, app: str, name: str, library: str, memory: bool) -
 def codex_command(binary: str, model: str, prompt: str, session: str = "") -> list[str]:
     # `codex exec` never asks for an approval: what the run folder's sandbox refuses fails, as in a
     # scheduled task. --skip-git-repo-check: the run folder is in no git repository.
-    options = ["--json", "--skip-git-repo-check", "-c", f"model={json.dumps(model)}", *codex_installed_skills()]
+    options = ["--json", "--skip-git-repo-check", "-c", f"model={json.dumps(model)}", *schedule.codex_exec_options(),
+               *codex_installed_skills()]
     return [binary, "exec", *options, *(["resume", session] if session else []), prompt]
 
 

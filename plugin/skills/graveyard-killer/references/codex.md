@@ -55,7 +55,7 @@ The ChatGPT app's Scheduled tasks start the Worker, so the user sees each run, i
    python3 ~/.agents/skills/graveyard-killer/scripts/schedule.py codex --folder ~/graveyard-killer --library "<the Library link>" --alert "Graveyard Killer non è riuscito a fare il riordino di oggi."
    ```
 
-   It prints one JSON object; `"error"` means it did nothing. It writes the folder's `AGENTS.md` with the pointer, unless one is there, `codex.json`, and its `.codex` folder: the sandbox's profile and rules, Notion's server, approved for writes since nobody watches the run, and the Worker's model, GPT-6 Luna at high effort. It also marks the folder as trusted in `~/.codex/config.toml`, since Codex ignores an untrusted folder's `.codex`. Done when it lists what it wrote.
+   It prints one JSON object; `"error"` means it did nothing. It writes the folder's `AGENTS.md` with the pointer, unless one is there, and its `.codex` folder: the sandbox's profile and rules, the Library link and the alert, Notion's server, approved for writes since nobody watches the run, and the Worker's model, GPT-6 Luna at high effort. `codex-run` gives the unattended run only the Notion tools a Worker needs: never one that deletes, moves or shares. It also marks the folder as trusted in `~/.codex/config.toml`, since Codex ignores an untrusted folder's `.codex`. Done when it lists what it wrote.
 
 3. **Create the task** with your scheduling tool, which asks the user to approve it. If you have none, walk the user through *Scheduled → New task* in the app's sidebar with the same values. Done when the task shows in *Scheduled*.
    - a standalone task, which starts a new chat for each run
