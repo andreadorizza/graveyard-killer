@@ -45,6 +45,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from link import TIKTOK_SHORT_HOSTS
 from link import parse as parse_link
 
 T = TypeVar("T")
@@ -354,6 +355,17 @@ def keep_cookie_copies_in(folder: Path) -> None:
         os.environ[name] = str(temporary)
 
 
+def platform_share_link(link: str) -> bool:
+    """A link with no post id that the platform itself turns into a post's link: TikTok's short
+    links and Instagram's /share/ links. Never Instagram's link shim, l.instagram.com, which leads
+    off the platform."""
+    parts = urlsplit(link)
+    host = (parts.hostname or "").lower()
+    if host in TIKTOK_SHORT_HOSTS:
+        return True
+    return host in ("instagram.com", "www.instagram.com") and parts.path.startswith("/share/")
+
+
 def refused(link: str, reason: str) -> dict[str, Any]:
     """A read stopped before any tool ran."""
     return {"status": "error", "reason": reason, "link": link, "work": None}
@@ -363,10 +375,18 @@ def read(link: str, language: str | None = None, login: str | None = None) -> di
     if not WEB_LINK.match(link):
         # Refused before any tool runs: a "link" such as "--exec=..." would be read as an option.
         return refused(link, "not a web link")
-    if parse_link(link).get("platform") not in PLATFORMS:
+    post = parse_link(link)
+    if post.get("platform") not in PLATFORMS:
         # Refused before any tool runs. The Worker reads another page with its web fetch tool, and
         # where read runs outside an agent's sandbox (Codex) any other link could carry data out.
         return refused(link, "not an Instagram, TikTok or YouTube link: read the page with your web fetch tool")
+    if post.get("id"):
+        # The tools get the post's own link, rebuilt from its id: a link on the platform's host can
+        # still redirect elsewhere, such as YouTube's /redirect or l.instagram.com.
+        link = post["link"]
+    elif not platform_share_link(link):
+        return refused(link, "not a post's own link: read takes an Instagram, TikTok or YouTube post, not a "
+                             "profile, a search or a redirect to another site")
     access = LOGGED_OUT
     if login is not None:
         named = login_access(login)

@@ -365,8 +365,9 @@ def test_a_post_hidden_from_logged_out_visitors_is_login_only(post: Callable[...
 
 
 def test_a_link_with_shell_characters_reaches_the_tool_unchanged(post: Callable[..., Run]) -> None:
-    # On Windows a .cmd or .bat tool would run through cmd.exe, where & and | start commands.
-    link = VIDEO + "&t=1|whoami&echo=%20x"
+    # On Windows a .cmd or .bat tool would run through cmd.exe, where & and | start commands. A post's
+    # own link is rebuilt from its id, so a short link, which goes as it is, carries them here.
+    link = "https://vt.tiktok.com/ZSabc123/?a=1&t=1|whoami&echo=%20x"
     run = post("read", link, scenario={"yt-dlp": [{"exit": 1, "stderr": "ERROR: Video unavailable"}]})
 
     assert run.called("yt-dlp")[0][-1] == link
@@ -1062,10 +1063,31 @@ def test_upload_sends_only_an_image_that_read_made(post: Callable[..., Run], tmp
 
 
 @pytest.mark.parametrize("link", ["https://en.wikipedia.org/wiki/Pizzoccheri", "https://evil.test/?d=secret",
-                                  "https://www.youtube.com.evil.test/watch?v=1"])
+                                  "https://www.youtube.com.evil.test/watch?v=1",
+                                  "https://www.youtube.com/redirect?q=https%3A%2F%2Fevil.test%2F%3Fd%3Dsecret",
+                                  "https://l.instagram.com/?u=https%3A%2F%2Fevil.test%2F%3Fd%3Dsecret",
+                                  "https://www.youtube.com/attribution_link?u=%2Fwatch%3Fv%3DdQw4w9WgXcQ",
+                                  "https://www.youtube.com/@somechannel"])
 def test_read_refuses_a_link_that_is_not_a_platform_post(post: Callable[..., Run], link: str) -> None:
     # Another page is read with web fetch; and where read runs outside a sandbox, a link could carry data out.
     run = post("read", link)
-    assert run.output["status"] == "error" and "web fetch" in run.output["reason"]
+    assert run.output["status"] == "error"
+    assert "web fetch" in run.output["reason"] or "a post's own link" in run.output["reason"]
     assert run.output["work"] is None
     assert run.calls == []  # no tool ran
+
+
+def test_read_gives_the_tools_the_post_s_own_link(post: Callable[..., Run]) -> None:
+    """What reaches the tools is rebuilt from the post's id, never the text the read was given."""
+    run = post("read", "https://youtu.be/dQw4w9WgXcQ?si=tracking&next=https%3A%2F%2Fevil.test",
+               scenario={"yt-dlp": [{"exit": 1, "stderr": "ERROR: [youtube] dQw4w9WgXcQ: Video unavailable"}]})
+    [yt_dlp] = run.called("yt-dlp")
+    assert yt_dlp[-1] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    assert "evil.test" not in " ".join(yt_dlp)
+
+
+def test_an_instagram_share_link_is_still_read(post: Callable[..., Run]) -> None:
+    """Instagram turns its own /share/ links into a post's link: they stay readable, unlike l.instagram.com."""
+    link = "https://www.instagram.com/share/reel/BAbCdEf123/"
+    run = post("read", link, scenario={"yt-dlp": [{"exit": 1, "stderr": "ERROR: Video unavailable"}]})
+    assert run.called("yt-dlp")[0][-1] == link
