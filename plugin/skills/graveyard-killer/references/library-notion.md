@@ -81,7 +81,7 @@ Set the cover only when the Fields table has a Cover row. To set it:
    python3 scripts/post.py upload "<image>" "<upload URL>" --header "<name>: <value>"
    ```
 
-   Done when it prints `uploaded`. It sends only to Notion, and only an image that the post script made.
+   In Codex, give the script's full path and single quotes instead, as [codex.md](codex.md#run-the-scripts) says. Done when it prints `uploaded`. It sends only to Notion, and only an image that the post script made.
 3. Set the Cover property to the upload, as its only file, at once: Notion deletes an upload that no page holds within an hour.
 
 ### Add a Category

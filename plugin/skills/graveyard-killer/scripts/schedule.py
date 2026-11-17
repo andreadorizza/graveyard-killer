@@ -7,7 +7,7 @@ or prepare the run folder of a Worker that Codex schedules itself.
     schedule.py show [--name …]      the job's time, days, model, Library and last run
     schedule.py remove [--name …]    unload and delete the job; the run folder stays
     schedule.py run --folder <run folder>    what the job starts: one Worker run in OpenCode
-    schedule.py codex --folder <run folder> --library <link>
+    schedule.py codex --folder <run folder> --library <link> [--alert <text>] [--old-folder <folder>]
                                      the run folder of a scheduled task in the ChatGPT desktop app
 
 Codex: the ChatGPT desktop app's own Scheduled tasks start the Worker, so `codex` installs no
@@ -15,6 +15,10 @@ job. It writes the run folder's AGENTS.md, a .codex/config.toml whose permission
 commands read only the skills and the run folder and reach no network, and a rules file that
 lets the skill's own scripts, called by their full path, run outside that sandbox. It also
 marks the folder as trusted in Codex's config, since Codex ignores an untrusted folder's .codex.
+
+Each route has a run folder of its own: OpenCode's job ~/graveyard-killer, Codex's task
+~/graveyard-killer-codex. In one folder they would share its AGENTS.md, log and lock, and run the
+Worker twice a day, so `install` refuses Codex's folder and `codex` refuses OpenCode's.
 
 The job starts `run` with the Python that installed it. `run` starts `opencode run` in the
 run folder, which holds its opencode.json and AGENTS.md, with schedule.md's prompt as one
@@ -258,11 +262,15 @@ CODEX_WORK = "work"  # post.py's work folders: inside the run folder, which the 
 # The Library and the failure alert, for codex-run. In .codex/, which a scheduled task's default
 # permissions keep read-only even where they let it write the run folder (2026-11-17).
 CODEX_SETTINGS = ".codex/graveyard-killer.json"
+CODEX_CONFIG_HEADER = "# Graveyard Killer's Worker runs in this folder, written by schedule.py codex.\n"
+CODEX_SCRIPTS_START = "Graveyard Killer's scripts are in "  # the first words of CODEX_SCRIPTS_LINE
 # The Notion tools the unattended Worker run may use; deleting, moving or sharing is never one of
 # them. The task's chat, where the user answers the Ping, keeps Notion's other tools.
+# notion-create-file-upload only makes a short-lived URL for one file, to which post.py upload
+# sends an Entry's cover (library-notion.md, "Set the cover"); without it no Entry got one.
 CODEX_NOTION_TOOLS = ("notion-search", "notion-fetch", "notion-query-data-sources", "notion-create-pages",
                       "notion-update-page", "notion-update-data-source", "notion-create-view",
-                      "notion-update-view", "notion-get-async-task")
+                      "notion-update-view", "notion-get-async-task", "notion-create-file-upload")
 CODEX_LOCK = ".worker-run.lock"  # one codex-run at a time in a run folder
 # The ChatGPT desktop app's own codex, when none is on PATH (macOS, app 26.1111).
 CODEX_APP_CLI = Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex")
@@ -322,7 +330,7 @@ def codex_config(folder: Path, skills: Path) -> str:
     """
     work = folder / CODEX_WORK
     return (
-        "# Graveyard Killer's Worker runs in this folder, written by schedule.py codex.\n"
+        f"{CODEX_CONFIG_HEADER}"
         "# Commands may read only the skills and this folder, and reach no network. The skill's own\n"
         f"# scripts, called by their full path, run outside the sandbox: rules/{CODEX_RULES}.\n"
         f"default_permissions = {toml_string(CODEX_PROFILE)}\n"
@@ -442,7 +450,7 @@ def prepare_codex_folder(folder: Path, library: str, skills: Path | None = None,
     line = CODEX_SCRIPTS_LINE.format(scripts=scripts[0].parent, post=scripts[0])
     current = agents.read_text(encoding="utf-8") if agents.exists() else POINTER.format(library=library)
     if line not in current:  # Setup may have written the pointer in the user's language
-        kept = [old for old in current.splitlines(keepends=True) if not old.startswith("Graveyard Killer's scripts are in ")]
+        kept = [old for old in current.splitlines(keepends=True) if not old.startswith(CODEX_SCRIPTS_START)]
         agents.write_text("".join(kept).rstrip("\n") + "\n" + line, encoding="utf-8")
         written.append(str(agents))
     if trust_codex_folder(folder):
@@ -450,10 +458,50 @@ def prepare_codex_folder(folder: Path, library: str, skills: Path | None = None,
     return written
 
 
+def is_codex_folder(folder: Path) -> bool:
+    return (folder / CODEX_SETTINGS).is_file()
+
+
+def is_opencode_folder(folder: Path) -> bool:
+    return (folder / SETTINGS).is_file() or (folder / "opencode.json").is_file()
+
+
+def leave_codex_folder(old: Path) -> list[str]:
+    """Remove what `codex` wrote in a run folder that Codex's task no longer runs in, such as
+    0.11.0's ~/graveyard-killer, which OpenCode's job may use too. Only Codex's own files go: its
+    settings, profile and rules, and AGENTS.md's scripts line. The pointer, the log and any other
+    file stay, and so does the folder's trust in Codex's config, harmless with no .codex there.
+    Returns what was removed."""
+    if not is_codex_folder(old):
+        return []
+    removed: list[str] = []
+    for path in (old / CODEX_SETTINGS, old / ".codex" / "config.toml", old / ".codex" / "rules" / CODEX_RULES):
+        if path.name == "config.toml" and path.is_file() and \
+                not path.read_text(encoding="utf-8").startswith(CODEX_CONFIG_HEADER):
+            continue  # not written by codex: the user's own
+        if path.is_file():
+            path.unlink()
+            removed.append(str(path))
+    for empty in (old / ".codex" / "rules", old / ".codex", old / CODEX_WORK):
+        try:
+            empty.rmdir()  # only an empty folder
+        except OSError:
+            pass
+    agents = old / "AGENTS.md"
+    if agents.is_file():
+        lines = agents.read_text(encoding="utf-8").splitlines(keepends=True)
+        kept = [line for line in lines if not line.startswith(CODEX_SCRIPTS_START)]
+        if kept != lines:
+            agents.write_text("".join(kept), encoding="utf-8")
+            removed.append(f"{agents}: Codex's scripts line")
+    return removed
+
+
 def codex(args: argparse.Namespace) -> dict[str, Any]:
-    for option in ("folder", "library", "alert"):  # as install does: every setting stays on one line
-        if CONTROL.search(getattr(args, option)):
-            raise Refused(f"--{option} has a line break or another control character: give it on one line.")
+    for option in ("folder", "library", "alert", "old_folder"):  # as install does: every setting on one line
+        if CONTROL.search(getattr(args, option) or ""):
+            raise Refused(f"--{option.replace('_', '-')} has a line break or another control character: "
+                          "give it on one line.")
     if not re.match(r"^https?://\S+$", args.library):
         raise Refused(f"The Library link {args.library!r} is not a web link.")
     command = find_codex()
@@ -461,10 +509,19 @@ def codex(args: argparse.Namespace) -> dict[str, Any]:
         raise Refused("Codex's command, codex, is not on PATH and the ChatGPT app is not where it bundles one: "
                       "install Codex's command-line tool, from https://learn.chatgpt.com/docs/codex/cli.")
     folder = Path(args.folder).expanduser().resolve()
+    if is_opencode_folder(folder):
+        raise Refused(f"{folder} is OpenCode's run folder, where this computer's scheduler runs the Worker: "
+                      "give Codex a folder of its own, such as ~/graveyard-killer-codex.")
+    old = Path(args.old_folder).expanduser().resolve() if args.old_folder else None
+    if old == folder:
+        raise Refused("--old-folder is the run folder itself: give the folder the task ran in before.")
     written = prepare_codex_folder(folder, args.library, alert=args.alert)
-    return {"folder": str(folder), "written": written, "model": CODEX_MODEL, "effort": CODEX_EFFORT,
-            "prompt": CODEX_TASK_PROMPT.format(command=codex_task_command(folder, skills_folder()),
-                                               library=args.library)}
+    result = {"folder": str(folder), "written": written, "model": CODEX_MODEL, "effort": CODEX_EFFORT,
+              "prompt": CODEX_TASK_PROMPT.format(command=codex_task_command(folder, skills_folder()),
+                                                 library=args.library)}
+    if old is not None:
+        result["removed"] = leave_codex_folder(old)
+    return result
 
 
 # ---------------------------------------------------------------- macOS: launchd
@@ -743,6 +800,9 @@ def install(args: argparse.Namespace) -> dict[str, Any]:
     opencode = shutil.which("opencode")
     if not opencode:
         raise Refused("OpenCode is not installed, or not on PATH: install it first.")
+    if is_codex_folder(Path(args.folder).expanduser().resolve()):
+        raise Refused(f"{args.folder} is Codex's run folder, where a ChatGPT scheduled task runs the Worker: "
+                      "give OpenCode a folder of its own, such as ~/graveyard-killer-opencode.")
     job = Job(
         name=args.name,
         time=f"{int(match.group(1)):02d}:{match.group(2)}",
@@ -1171,6 +1231,8 @@ def main() -> None:
     codex_parser.add_argument("--library", required=True, help="the Library link")
     codex_parser.add_argument("--alert", default=DEFAULT_ALERT, help="the line a failed run's chat shows, in the "
                               "Settings language")
+    codex_parser.add_argument("--old-folder", help="the run folder the task used before, such as 0.11.0's "
+                                                   "~/graveyard-killer: Codex's files there are removed")
     codex_run_parser = commands.add_parser("codex-run", help="what the Codex scheduled task runs")
     codex_run_parser.add_argument("--folder", required=True, type=Path)
     args = parser.parse_args()

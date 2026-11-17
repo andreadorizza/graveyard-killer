@@ -890,6 +890,11 @@ $app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell
 """
 # macOS: the text is the script's arguments, never part of the script.
 MAC_NOTIFICATION = ("on run argv", "display notification (item 2 of argv) with title (item 1 of argv)", "end run")
+# In a sandbox, Codex's included, osascript cannot load `display notification`, so the script above
+# fails to compile: "syntax error: Expected end of line but found identifier. (-2741)" (2026-11-17).
+MAC_SANDBOXED = "(-2741)"
+MAC_SANDBOXED_REASON = ("osascript could not read its notification command (-2741), as happens when it runs in a "
+                        "sandbox such as Codex's: run post.py notify outside the sandbox")
 
 
 def notify(title: str, message: str) -> dict[str, Any]:
@@ -918,6 +923,8 @@ def notify(title: str, message: str) -> dict[str, Any]:
         return {"notified": False, "reason": str(failed)}
     if result.returncode != 0:
         lines = (result.stderr or "").strip().splitlines()
+        if command[0] == "osascript" and lines and MAC_SANDBOXED in lines[-1]:
+            return {"notified": False, "reason": MAC_SANDBOXED_REASON}
         return {"notified": False, "reason": lines[-1] if lines else f"{command[0]} exited with {result.returncode}"}
     return {"notified": True}
 
