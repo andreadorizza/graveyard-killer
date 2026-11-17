@@ -41,6 +41,10 @@ Do every step whose version is newer than the Library's Version, or every step w
 
 - **Codex's run folder.** Codex's Worker now runs in a folder of its own, `graveyard-killer-codex` in the home folder, since OpenCode's runs in `graveyard-killer`. A Codex task made by 0.11.0 runs in `graveyard-killer` and keeps working there. Only when this Worker run's own folder, the one it runs in, holds both OpenCode's `opencode.json` and Codex's `.codex/graveyard-killer.json` do both run the Worker there, twice a day: ask the user to say "update my Graveyard Killer schedule" in a Codex chat, which moves Codex's run to its own folder ([codex.md](codex.md#schedule-the-worker)). Otherwise ask nothing.
 
+### 0.12.0
+
+- **Obsidian.** Setup can now make a Library in an Obsidian vault ([library-obsidian.md](library-obsidian.md)). A Notion or Google Drive Library has nothing to change, so ask nothing of the user.
+
 ## Every upgrade
 
 Last, whatever the Library's Version:

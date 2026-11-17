@@ -214,7 +214,7 @@
         "The Settings hold these sections, in this order: Language, Fields, Statuses, Categories, Schedule, Limits, Instagram login, Pings, Preferences, Graveyard, Version",
         "The Limits are 20 per day and 100 per week. Instagram login has 'Browser' empty and 'Reads per run' at 3. Pings has 'Ping by', 'Last Ping', 'Last Digest' and 'Open offers'. Preferences is a table",
         "The Graveyard section no longer holds 'Dig up per run', and 'Last import' is still 2026-10-26",
-        "Version is 0.11.1",
+        "Version is 0.12.0",
         "Language, Statuses and Categories are unchanged, and the Schedule still says 'Domenica 10:00'. Fields is unchanged but, on Notion, for a new Cover row after Note",
         "On Notion, Entries has a Files & media property with the Cover row's name and, after the table, the gallery, to-read and board views of library-notion.md's 'Add the views', named in the Settings language, as tabs of Entries and not as linked databases on the Library page. On Google Drive, the Sheet is unchanged",
         "The Inbox Entry is Processed",
