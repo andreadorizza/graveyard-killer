@@ -146,3 +146,26 @@ def test_an_opencode_session_gets_the_stand_ins(tmp_path: Path, monkeypatch: pyt
     with run_evals.posts(tmp_path / "run", live=False):
         env = run_evals.opencode_env()
     assert env["PATH"].split(os.pathsep)[0] == str(tmp_path / "run" / "fakes" / "bin")
+
+
+def test_codex_gets_a_non_login_shell_only_with_fake_posts(tmp_path: Path) -> None:
+    """A login shell's profile put Homebrew's yt-dlp ahead of the stand-ins (2026-11-17)."""
+    with run_evals.posts(tmp_path / "fake", live=False):
+        assert "allow_login_shell=false" in run_evals.codex_command("codex", "gpt-6-luna", "run")
+    with run_evals.posts(tmp_path / "live", live=True):
+        assert "allow_login_shell=false" not in run_evals.codex_command("codex", "gpt-6-luna", "run")
+
+
+def test_the_runner_warns_when_the_real_tools_ran(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    with run_evals.posts(tmp_path, live=False):
+        read = {"status": "ok", "platform": "instagram", "link": "https://www.instagram.com/p/X/"}
+        (tmp_path / "out.jsonl").write_text(json.dumps({"output": json.dumps(read)}) + "\n", encoding="utf-8")
+    assert "WARNING: the real tools ran" in capsys.readouterr().out
+
+
+def test_a_live_run_drops_a_fake_runs_log(tmp_path: Path) -> None:
+    with run_evals.posts(tmp_path, live=False):
+        call: dict[str, Any] = {"tool": "yt-dlp", "argv": [], "link": None, "post": "youtube-aaaa", "cwd": str(tmp_path)}
+        (tmp_path / "fakes" / "calls.jsonl").write_text(json.dumps(call) + "\n", encoding="utf-8")
+    with run_evals.posts(tmp_path, live=True):
+        assert not (tmp_path / "fakes").exists()

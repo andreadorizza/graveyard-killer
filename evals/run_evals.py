@@ -83,6 +83,9 @@ DISALLOWED = ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar", "PushNot
 FAKE_TOOLS = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2")
 FAKE_SOURCE = HERE / "fakes" / "post_tools.py"
 FIXTURES = HERE / "fixtures" / "posts"
+FAKE_POSTS_ON = "GK_FAKE_POSTS"  # set while a session runs with the stand-ins
+# A post.py read that ended "ok" on a platform, as it appears, JSON-escaped or not, in a session's stream.
+READ_OK = re.compile(r'\\*"status\\*": \\*"ok\\*", \\*"platform\\*": \\*"(?:instagram|tiktok|youtube)')
 # Evals that test the platforms themselves, so they read real posts: TikTok's short links (2, 4), how
 # YouTube reports a missing video (5) and Instagram's posts for signed-in users only (13, 14, 19).
 LIVE_POSTS = {("worker", 2), ("worker", 4), ("worker", 5), ("worker", 13), ("worker", 14), ("worker", 19)}
@@ -455,6 +458,10 @@ def codex_command(binary: str, model: str, prompt: str, session: str = "") -> li
     # scheduled task. --skip-git-repo-check: the run folder is in no git repository.
     options = ["--json", "--skip-git-repo-check", "-c", f"model={json.dumps(model)}", *schedule.codex_exec_options(),
                *codex_installed_skills()]
+    if os.environ.get(FAKE_POSTS_ON):
+        # Codex runs commands in a login shell, whose profile can put Homebrew's yt-dlp ahead of the
+        # stand-ins on PATH: on 2026-11-17 that read two real posts. A non-login shell keeps PATH as given.
+        options += ["-c", "allow_login_shell=false"]
     return [binary, "exec", *options, *(["resume", session] if session else []), prompt]
 
 
@@ -576,19 +583,26 @@ def posts(folder: pathlib.Path, live: bool) -> Iterator[None]:
 
     PATH changes in the runner's own environment, so every agent's session gets it, and so does
     what the session's setup records from it, as `schedule.py` records PATH for a scheduled run.
+    A shell that rebuilds PATH can still reach the real tools, so the runner warns when the session's
+    stream shows a post read that no stand-in answered.
     """
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "posts.txt").write_text("live\n" if live else "fake\n", encoding="utf-8")
     if live:
+        shutil.rmtree(folder / "fakes", ignore_errors=True)  # a fake run's log, left in a reused run folder
         yield
         return
     before = len(fake_calls(folder))
+    stream = folder / "out.jsonl"
+    seen = stream.stat().st_size if stream.exists() else 0
     path = os.environ.get("PATH", "")
     os.environ["PATH"] = f"{install_fakes(folder)}{os.pathsep}{path}"
+    os.environ[FAKE_POSTS_ON] = "1"
     try:
         yield
     finally:
         os.environ["PATH"] = path
+        os.environ.pop(FAKE_POSTS_ON, None)
         calls = fake_calls(folder)[before:]
         tools: dict[str, int] = {}
         for call in calls:
@@ -601,6 +615,14 @@ def posts(folder: pathlib.Path, live: bool) -> Iterator[None]:
         if missing:
             print(f"--- {folder.name}: no recorded post for {', '.join(missing)}: each read failed as `error`. "
                   f"Add it to {FIXTURES.relative_to(REPO)} or run the eval with --live-posts.", flush=True)
+        text = stream.read_bytes()[seen:].decode("utf-8", "replace") if stream.exists() else ""
+        reads = len(READ_OK.findall(text))
+        answered = sum(1 for c in calls if c["tool"] == "yt-dlp" and c["post"])
+        strange = [c for c in calls if c["tool"] not in ("yt-dlp", "gallery-dl") and not c["post"]]
+        if (reads and not answered) or strange:
+            print(f"--- {folder.name}: WARNING: the real tools ran: post.py read {reads} post(s) with no stand-in "
+                  f"yt-dlp answering, or a stand-in speech engine got media that no recording holds. "
+                  f"Check PATH in the agent's shell.", flush=True)
 
 
 def live_posts(flags: dict[str, bool], folder: pathlib.Path, eval_key: tuple[str, int] | None) -> bool:
