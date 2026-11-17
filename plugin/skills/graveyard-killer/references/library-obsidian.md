@@ -51,7 +51,7 @@ The shared saves are the shares in the Share here note's body.
 
 ## vault.py
 
-Run every read and write of the Library with this skill's `scripts/vault.py`, and never edit the vault's files any other way. It writes properties as valid YAML whatever a caption holds, changes only the properties you name, never leaves a note half written, and escapes text from a post. Every command prints JSON. A command that fails prints `{"error": "..."}`: say what failed, and do not write around it.
+Run every read and write of the Library with this skill's `scripts/vault.py`, and never edit the vault's files any other way. It reads and writes only notes, the Base and images inside an Obsidian vault, outside its `.obsidian` and `.trash` folders, and refuses any other path. It writes properties as valid YAML whatever a caption holds, changes only the properties you name, never leaves a note half written, and escapes text from a post. Every command prints JSON. A command that fails prints `{"error": "..."}`: say what failed, and do not write around it.
 
 Run it the way you run this skill's other scripts, `python3 scripts/vault.py` or with the script's full path, such as `python3 /path/to/graveyard-killer/scripts/vault.py list "<folder>"`, one command per call, with no shell variables. Put the paths you pass it in double quotes, not the script's own path: an approval to run the script matches the command as written. A command that writes takes its JSON from a file, never from the command itself: Claude Code holds back a command whose text has a brace beside a quote, and text from a post can hold anything. So for each write:
 
@@ -72,7 +72,7 @@ Run it the way you run this skill's other scripts, `python3 scripts/vault.py` or
 - **`set`** sets properties and leaves every other one as it was. A text is a string; `tags` is a list of strings; a date is `{"date": "YYYY-MM-DD"}`; `null` clears a property. **`unset`** removes properties.
 - **`append`** adds parts at the end of the body, and **`prepend`** at its start. A part is `{"post": "..."}` for text from the post, such as a caption, a transcript paragraph or on-screen text; `{"markdown": "..."}` for your own words, such as a "Captured again" line; or `{"heading": "..."}` for a heading. **`sections`** puts parts under a `## ` heading: it replaces that section where the note has one, else adds it at the end, so writing it twice never doubles it. **`body`** replaces the whole body.
 - **`list`** prints a first line `{"count": N}`, then one note per line, with its `name` and its properties: all of them, or one `--field` each. `--where` keeps only the notes that meet a condition: `NAME=VALUE`, `NAME!=VALUE`, `NAME~TEXT` (holds the text, in any case), `NAME>=VALUE` or `NAME<=VALUE` (dates compare as dates), and `NAME=` for an empty value. Several `--where` must all hold. `--extra path` and `--extra uri` add each note's path, for writes, and its link. A note's path is `<folder>/<name>.md`.
-- A `list` or `search` answer longer than about 25,000 characters is refused, since the shell would cut it. Ask for fewer fields, add a `--where`, or add `--out "<scratchpad>/gk-list.jsonl"` and read that file in parts with your file-reading tool.
+- A `list` or `search` answer longer than about 25,000 characters is refused, since the shell would cut it. Ask for fewer fields, add a `--where`, or add `--out "<scratchpad>/gk-list-1.jsonl"`, a new file each time, and read that file in parts with your file-reading tool.
 
 ## Writing to Obsidian
 

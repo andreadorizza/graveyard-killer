@@ -628,3 +628,60 @@ def test_a_missing_note_is_an_error(library: Path) -> None:
     out = vault("read", library / "Entries" / "Nope.md", ok=False)
 
     assert out["error"].startswith("no such file")
+
+
+# ---------- Only inside the vault ----------
+# The agent runs the script without asking, and a post's text may try to steer it.
+
+
+def test_no_write_outside_a_vault(library: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "profile.md"
+    outside.write_text("keep me\n", encoding="utf-8")
+
+    vault("update", outside, stdin={"body": "changed"}, ok=False)
+    vault("new-file", tmp_path / "new.md", ok=False)
+    vault("trash", outside, ok=False)
+    vault("move-text", outside, library / "Already read.md", stdin={"text": "keep me"}, ok=False)
+
+    assert outside.read_text(encoding="utf-8") == "keep me\n"
+    assert not (tmp_path / "new.md").exists()
+
+
+def test_no_write_in_the_vaults_own_folders_or_to_other_kinds_of_file(library: Path) -> None:
+    root = library.parent
+
+    assert "error" in vault("new-file", root / ".obsidian" / "plugins.md", ok=False)
+    assert "error" in vault("new-folder", root / ".trash" / "x", ok=False)
+    assert "error" in vault("new-file", library / "run.sh", ok=False)
+    assert "error" in vault("new-file", root, ok=False)
+    assert vault("new-file", library / "Library.base")["path"].endswith("Library.base")
+
+
+def test_a_link_inside_the_vault_to_a_file_outside_is_refused(library: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "elsewhere.md"
+    outside.write_text("keep me\n", encoding="utf-8")
+    (library / "Entries" / "Sneaky.md").symlink_to(outside)
+
+    vault("update", library / "Entries" / "Sneaky.md", stdin={"body": "changed"}, ok=False)
+
+    assert outside.read_text(encoding="utf-8") == "keep me\n"
+
+
+def test_out_is_only_a_new_jsonl_file(library: Path, tmp_path: Path) -> None:
+    taken = tmp_path / "taken.jsonl"
+    taken.write_text("keep me\n", encoding="utf-8")
+
+    vault("list", library / "Entries", "--out", taken, ok=False)
+    vault("list", library / "Entries", "--out", tmp_path / "list.txt", ok=False)
+
+    assert taken.read_text(encoding="utf-8") == "keep me\n"
+    assert vault("list", library / "Entries", "--out", tmp_path / "new.jsonl")["count"] == 0
+
+
+def test_attach_copies_only_an_image(library: Path, tmp_path: Path) -> None:
+    secret = tmp_path / "id_rsa"
+    secret.write_text("PRIVATE\n", encoding="utf-8")
+
+    vault("attach", secret, library / "Attachments", "Post", ok=False)
+
+    assert not (library / "Attachments").exists() or not any((library / "Attachments").iterdir())

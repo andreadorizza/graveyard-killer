@@ -31,8 +31,11 @@ empty), --extra path|uri|modified, and --out FILE. list and search print a first
 {"count": N}, then one note per line, and refuse to print more than LIMIT characters:
 narrow the question, or write the lines to a file with --out.
 
-Paths are absolute; a leading ~ is the home folder. Every other command prints one JSON
-value. An error prints {"error": "..."} and exits with 1.
+Every other command prints one JSON value. An error prints {"error": "..."} and exits with 1.
+
+Paths are absolute; a leading ~ is the home folder. The notes, folders and files a command
+reads or writes must be inside an Obsidian vault, outside its dot folders such as .obsidian
+and .trash, and are only .md notes, a .base file or images. --out makes only a new .jsonl file.
 
 The JSON goes in a file, written by the agent's own file tool, never in the command:
 Claude Code holds back a shell command whose text has a brace beside a quote, and text
@@ -108,6 +111,29 @@ def path_arg(raw: str) -> Path:
     path = Path(raw).expanduser()
     if not path.is_absolute():
         fail(f"not an absolute path: {raw}")
+    return path
+
+
+NOTE = (".md",)
+IMAGES = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".heic")
+
+
+def in_vault(raw: str, suffixes: tuple[str, ...] | None = NOTE) -> Path:
+    """A path inside an Obsidian vault, with links followed, outside the vault's own dot folders.
+
+    The agent runs this script without asking the user, and text from a post may try to steer
+    it, so the script reads and writes only notes, the Base and images inside a vault: never
+    another file on the computer, and never Obsidian's .obsidian folder or its .trash.
+    """
+    path = path_arg(raw).resolve()
+    root = vault_root(path)
+    if root is None:
+        fail(f"not inside an Obsidian vault: {raw}")
+    parts = path.relative_to(root).parts
+    if not parts or any(part.startswith(".") for part in parts):
+        fail(f"not a place for notes in the vault: {raw}")
+    if suffixes is not None and path.suffix.lower() not in suffixes:
+        fail(f"not a {' or '.join(suffixes)} file: {raw}")
     return path
 
 
@@ -556,8 +582,11 @@ def holds(properties: Properties, where: tuple[str, str, str]) -> bool:
 def print_lines(items: list[dict[str, Any]], out: str | None) -> None:
     lines = [json.dumps(item, ensure_ascii=False) for item in items]
     if out:
+        # Outside the vault, so only a new .jsonl file in a folder that exists: never one that is there.
         target = path_arg(out)
-        write_text(target, "".join(f"{line}\n" for line in lines))
+        if target.suffix != ".jsonl" or not target.parent.is_dir():
+            fail(f"--out is a new .jsonl file in a folder that exists: {out}")
+        write_new(target, "".join(f"{line}\n" for line in lines))
         print(json.dumps({"count": len(lines), "out": str(target)}))
         return
     text = "\n".join([json.dumps({"count": len(lines)}), *lines])
@@ -580,7 +609,7 @@ def cmd_check(args: argparse.Namespace) -> Any:
 def cmd_list(args: argparse.Namespace) -> None:
     wheres = [condition(w) for w in args.where or []]
     items = []
-    for note in notes(path_arg(args.folder)):
+    for note in notes(in_vault(args.folder, None)):
         properties = properties_of(load(note)[0])
         if not all(holds(properties, w) for w in wheres):
             continue
@@ -593,7 +622,7 @@ def cmd_list(args: argparse.Namespace) -> None:
 
 
 def cmd_read(args: argparse.Namespace) -> Any:
-    note = path_arg(args.note)
+    note = in_vault(args.note)
     frontmatter, body = load(note)
     return {"path": str(note), "name": note.stem, "uri": uri(note), "modified": modified(note),
             "properties": properties_of(frontmatter), "body": body}
@@ -602,7 +631,7 @@ def cmd_read(args: argparse.Namespace) -> Any:
 def cmd_search(args: argparse.Namespace) -> None:
     words = [w.casefold() for w in args.words]
     items = []
-    for note in notes(path_arg(args.folder)):
+    for note in notes(in_vault(args.folder, None)):
         frontmatter, body = load(note)
         properties = properties_of(frontmatter)
         values = " ".join(json.dumps(v, ensure_ascii=False) for v in properties.values()).casefold()
@@ -670,13 +699,13 @@ def cmd_shares(args: argparse.Namespace) -> Any:
     vault's .trash folder. Written first, trashed after: stopped halfway, the next call
     finds the same shares and adds none twice.
     """
-    note = path_arg(args.note)
+    note = in_vault(args.note)
     copies = conflict_copies(note)
     frontmatter, body = load(note)
     changed = max(p.stat().st_mtime for p in [note, *copies])
     shares = split_shares(body)
     if copies:
-        done = load(path_arg(args.already_read))[1] if args.already_read else ""
+        done = load(in_vault(args.already_read))[1] if args.already_read else ""
         kept: list[str] = []
         for text in shares + [t for copy in copies for t in split_shares(load(copy)[1])]:
             if text not in kept and whole_lines(done, escape(text)) == -1:
@@ -697,14 +726,14 @@ def cmd_shares(args: argparse.Namespace) -> Any:
 
 def cmd_create(args: argparse.Namespace) -> Any:
     change = input_json()
-    note = free_name(path_arg(args.folder), args.name, ".md")
+    note = free_name(in_vault(args.folder, None), args.name, ".md")
     lines, body = apply([], "", change)
     write_new(note, dump(lines or None, body))
     return {"path": str(note), "uri": uri(note), "name": note.stem}
 
 
 def cmd_update(args: argparse.Namespace) -> Any:
-    note = path_arg(args.note)
+    note = in_vault(args.note)
     change = input_json()
     frontmatter, body = load(note)
     lines, body = apply(frontmatter, body, change)
@@ -721,7 +750,7 @@ def batch(key: str) -> list[dict[str, Any]]:
 
 
 def cmd_create_many(args: argparse.Namespace) -> Any:
-    folder = path_arg(args.folder)
+    folder = in_vault(args.folder, None)
     ready = [(item["name"], apply([], "", {k: v for k, v in item.items() if k != "name"})) for item in batch("name")]
     made = []
     for name, (lines, body) in ready:
@@ -734,7 +763,7 @@ def cmd_create_many(args: argparse.Namespace) -> Any:
 def cmd_update_many(args: argparse.Namespace) -> Any:
     ready = []
     for item in batch("path"):
-        note = path_arg(item["path"])
+        note = in_vault(item["path"])
         frontmatter, body = load(note)
         lines, body = apply(frontmatter, body, {k: v for k, v in item.items() if k != "path"})
         ready.append((note, dump(lines if (lines or frontmatter is not None) else None, body)))
@@ -755,16 +784,16 @@ def whole_lines(body: str, text: str) -> int:
 
 
 def cmd_move_text(args: argparse.Namespace) -> Any:
-    move_text(path_arg(args.source), path_arg(args.target), input_json().get("text", ""))
+    move_text(in_vault(args.source), in_vault(args.target), input_json().get("text", ""))
     return {"moved": True, "from": args.source, "to": args.target}
 
 
 def cmd_adopt(args: argparse.Namespace) -> Any:
-    source, target = path_arg(args.source), path_arg(args.target)
+    source, target = in_vault(args.source), in_vault(args.target)
     change = input_json()
     share = change.pop("share", "")
     find_lines(source, share)  # before anything is written
-    note = free_name(path_arg(args.folder), args.name, ".md")
+    note = free_name(in_vault(args.folder, None), args.name, ".md")
     lines, body = apply([], "", change)
     write_new(note, dump(lines or None, body))
     move_text(source, target, share)
@@ -796,10 +825,12 @@ def move_text(source: Path, target: Path, raw: Any) -> None:
 
 
 def cmd_attach(args: argparse.Namespace) -> Any:
-    source = path_arg(args.file)
+    source = path_arg(args.file).resolve()
     if not source.is_file():
         fail(f"no such file: {source}")
-    folder = path_arg(args.folder)
+    if source.suffix.lower() not in IMAGES:
+        fail(f"not an image: {source}")
+    folder = in_vault(args.folder, None)
     folder.mkdir(parents=True, exist_ok=True)
     target = free_name(folder, args.name, source.suffix.lower())
     try:
@@ -811,7 +842,7 @@ def cmd_attach(args: argparse.Namespace) -> Any:
 
 
 def cmd_trash(args: argparse.Namespace) -> Any:
-    note = path_arg(args.note).resolve()
+    note = in_vault(args.note)
     if not note.is_file():
         fail(f"no such file: {note}")
     root = vault_root(note.parent)
@@ -824,13 +855,13 @@ def cmd_trash(args: argparse.Namespace) -> Any:
 
 
 def cmd_new_file(args: argparse.Namespace) -> Any:
-    path = path_arg(args.path)
+    path = in_vault(args.path, (".md", ".base"))
     write_new(path, str(input_json().get("text", "")))
     return {"path": str(path), "uri": uri(path) if path.suffix == ".md" else None}
 
 
 def cmd_new_folder(args: argparse.Namespace) -> Any:
-    path = path_arg(args.path)
+    path = in_vault(args.path, None)
     path.mkdir(parents=True, exist_ok=True)
     return {"path": str(path)}
 
