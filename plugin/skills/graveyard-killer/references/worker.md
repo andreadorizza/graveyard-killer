@@ -30,7 +30,7 @@ You came here from the `graveyard-killer-worker` skill, or from Setup or Recall 
 
 6. **Count the failed tries,** as [Failed tries](#failed-tries) says. Done when every Entry this run left with a failed read has its count updated, or is Unavailable.
 
-7. **Gather the Ping,** as [ping.md](ping.md#gather-it) says. Done when you hold its Proposals, its fixes and, when due, its Digest, or know that nothing needs the user.
+7. **Gather the Ping,** as [ping.md](ping.md#gather-it) says. Open that section in every run, even one that only finished a page or two: each Entry this run finished, Platform Other included, may bring a Proposal, such as a grocery list for a recipe. Done when you hold its Proposals, its fixes and, when due, its Digest, each of them possibly empty.
 
 8. **Send the Ping, or end quietly,** as [ping.md](ping.md#send-it) says. Read that section again now, since the run is long by now, and do its steps in order. Done when the Ping is sent, or the run has ended with its one-line summary.
 
@@ -49,7 +49,7 @@ A shared save came in through the Library app's share route, or the user added i
 
 ### Platform Other
 
-An article or any other page has no media to read. If its Summary is empty, read the page with your web fetch tool and write the fields as in [Finish the Entry](#finish-the-entry). Then set Status Processed, set Processed to today, remove the ⏳ from the Title, and clear the Note. Done when the Entry is Processed.
+An article or any other page has no media to read. If its Summary is empty, read the page with your web fetch tool and write the fields as in [Finish the Entry](#finish-the-entry). Then set Status Processed, set Processed to today, remove the ⏳ from the Title, and clear the Note. Done when the Entry is Processed. It counts as finished in this run even when Capture already wrote its fields, so step 7 looks at it for a Proposal, from those fields.
 
 ### Instagram, TikTok and YouTube
 
