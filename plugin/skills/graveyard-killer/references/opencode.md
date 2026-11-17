@@ -2,7 +2,7 @@
 
 A user with no paid Claude plan runs Graveyard Killer in **OpenCode**, on one of its free models, and their computer's own scheduler starts the Worker every day ([ADR-0007](https://github.com/andreadorizza/graveyard-killer/blob/main/docs/adr/0007-a-free-worker-in-opencode.md)). This file holds what differs from Claude Desktop: installing the skills, Setup's steps that name the Code tab, the schedule and updates. Every other step works as written.
 
-You are in OpenCode when your tools and instructions are OpenCode's, or when this skill was loaded from `~/.config/opencode/skills`. The free route works with a Notion Library only: a Drive Library needs Google connectors that OpenCode does not have, and an Obsidian Library is tested with Claude only.
+You are in OpenCode when your tools and instructions are OpenCode's, or when this skill was loaded from `~/.config/opencode/skills`. Graveyard Killer in OpenCode works with a Notion Library only: a Drive Library needs Google connectors that OpenCode does not have, and an Obsidian Library is tested with Claude only.
 
 Paths here use `~/.config/opencode`, OpenCode's global folder on every system. On Windows that is `%USERPROFILE%\.config\opencode`. Both OpenCode 1.x and 2.x read this folder, `AGENTS.md` and the config shape below.
 
@@ -48,11 +48,11 @@ The user's first message in OpenCode points here, from the README, before the sk
 
 [Setup](setup.md#steps) runs as written, in an OpenCode chat, except these steps.
 
-- **Step 2, the Library:** Notion only. If the user wants Google Drive or Obsidian, say that the free route needs Notion, and that Drive and Obsidian need a paid Claude plan.
+- **Step 2, the Library:** Notion only. If the user wants Google Drive or Obsidian, say that Graveyard Killer in OpenCode needs Notion, and that Drive and Obsidian need a paid Claude plan.
 - **Step 3, the time:** say that the Worker runs while the computer is on and awake, whether or not OpenCode is open. A run missed while it slept or was off runs once when it is back: at once on a Mac, after about 10 minutes on Windows, and on Linux at the next login, since Linux starts a user's timers only after they log in.
 - **Step 6, the pointer:** it goes in `~/.config/opencode/AGENTS.md`, which OpenCode reads in every chat. Add [the pointer](setup.md#the-pointer) at the end of that file, creating it if needed, with the user's OK.
 - **Step 7, the schedule:** [schedule the Worker](#schedule-the-worker) below.
-- **Step 8, the phone:** only *Save through the Library app*, Notion's share menu. Skip the pointer in Claude's Instructions and *Save through Claude*: the free route puts the skills in OpenCode only, so a chat in the Claude app does not have them, and Graveyard Killer is untested on Claude's free plan.
+- **Step 8, the phone:** only *Save through the Library app*, Notion's share menu. Skip the pointer in Claude's Instructions and *Save through Claude*: this route puts the skills in OpenCode only, so a chat in the Claude app does not have them, and Graveyard Killer is untested on Claude's free plan.
 - **Step 9, Pings:** offer `push` or `none`. `email` needs a Gmail connector that OpenCode does not have.
   - `push`: a notification on this computer, shown by `post.py notify` ([ping.md](ping.md#send-it)). On a Mac it comes from Script Editor: if it does not show, the user turns on notifications for Script Editor in *System Settings → Notifications*. On Linux it needs `notify-send`.
   - Both: the whole Ping waits in the run's chat, and in `last-run.json` in the run folder. The user opens OpenCode in the run folder and picks the run's chat, whose id `schedule.py show` prints, or answers from any OpenCode chat by naming Graveyard Killer.
