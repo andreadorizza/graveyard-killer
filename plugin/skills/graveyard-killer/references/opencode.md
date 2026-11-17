@@ -52,10 +52,10 @@ The user's first message in OpenCode points here, from the README, before the sk
 - **Step 3, the time:** say that the Worker runs while the computer is on and awake, whether or not OpenCode is open. A run missed while it slept or was off runs once when it is back: at once on a Mac, after about 10 minutes on Windows, and on Linux at the next login, since Linux starts a user's timers only after they log in.
 - **Step 6, the pointer:** it goes in `~/.config/opencode/AGENTS.md`, which OpenCode reads in every chat. Add [the pointer](setup.md#the-pointer) at the end of that file, creating it if needed, with the user's OK.
 - **Step 7, the schedule:** [schedule the Worker](#schedule-the-worker) below.
-- **Step 8, the phone:** as written. The Claude app works on the free plan too, with connectors. For a chat there to read the Library, the user also connects Notion to Claude, in *Customize → Connectors* on claude.ai or in Claude Desktop, and pastes the pointer into their Instructions.
+- **Step 8, the phone:** only *Save through the Library app*, Notion's share menu. Skip the pointer in Claude's Instructions and *Save through Claude*: the free route puts the skills in OpenCode only, so a chat in the Claude app does not have them, and Graveyard Killer is untested on Claude's free plan.
 - **Step 9, Pings:** offer `push` or `none`. `email` needs a Gmail connector that OpenCode does not have.
   - `push`: a notification on this computer, shown by `post.py notify` ([ping.md](ping.md#send-it)). On a Mac it comes from Script Editor: if it does not show, the user turns on notifications for Script Editor in *System Settings → Notifications*. On Linux it needs `notify-send`.
-  - Both: the whole Ping waits in the run's chat, and in `last-run.json` in the run folder. The user opens OpenCode in the run folder and picks the run's chat, whose id `schedule.py show` prints, or answers from any chat, in OpenCode or in the Claude app, by naming Graveyard Killer.
+  - Both: the whole Ping waits in the run's chat, and in `last-run.json` in the run folder. The user opens OpenCode in the run folder and picks the run's chat, whose id `schedule.py show` prints, or answers from any OpenCode chat by naming Graveyard Killer.
   - The test Ping: send the alert through `post.py notify` and ask whether it showed.
 - **Step 11, updates:** to get a new version, the user tells OpenCode "update Graveyard Killer", which [updates the skills](#update).
 
