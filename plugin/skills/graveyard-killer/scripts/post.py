@@ -355,6 +355,20 @@ def keep_cookie_copies_in(folder: Path) -> None:
         os.environ[name] = str(temporary)
 
 
+# A post's own link, one form per platform, with nothing but the post's id and, on TikTok, its author.
+OWN_LINK = re.compile(r"https://www\.instagram\.com/p/[\w-]+/"
+                      r"|https://www\.youtube\.com/watch\?v=[\w-]+"
+                      r"|https://www\.tiktok\.com/(?:@[\w.-]+/(?:video|photo)|share/video)/\d+")
+
+
+def own_link(post: dict[str, Any]) -> str | None:
+    """The post's link rebuilt from its id, or None when it fits none of the forms in OWN_LINK."""
+    link = str(post.get("link") or "")
+    if post.get("platform") == "tiktok" and urlsplit(link).path.startswith("/share/video/"):
+        link = f"https://www.tiktok.com/share/video/{post['id']}"  # an export's link keeps no query
+    return link if OWN_LINK.fullmatch(link) else None
+
+
 def platform_share_link(link: str) -> bool:
     """A link with no post id that the platform itself turns into a post's link: TikTok's short
     links and Instagram's /share/ links. Never Instagram's link shim, l.instagram.com, which leads
@@ -383,7 +397,10 @@ def read(link: str, language: str | None = None, login: str | None = None) -> di
     if post.get("id"):
         # The tools get the post's own link, rebuilt from its id: a link on the platform's host can
         # still redirect elsewhere, such as YouTube's /redirect or l.instagram.com.
-        link = post["link"]
+        own = own_link(post)
+        if own is None:
+            return refused(link, "not a post's own link: read takes an Instagram, TikTok or YouTube post")
+        link = own
     elif not platform_share_link(link):
         return refused(link, "not a post's own link: read takes an Instagram, TikTok or YouTube post, not a "
                              "profile, a search or a redirect to another site")

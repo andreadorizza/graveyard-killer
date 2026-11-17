@@ -1091,3 +1091,21 @@ def test_an_instagram_share_link_is_still_read(post: Callable[..., Run]) -> None
     link = "https://www.instagram.com/share/reel/BAbCdEf123/"
     run = post("read", link, scenario={"yt-dlp": [{"exit": 1, "stderr": "ERROR: Video unavailable"}]})
     assert run.called("yt-dlp")[0][-1] == link
+
+
+@pytest.mark.parametrize(("given", "read_as"), [
+    ("https://www.tiktok.com/share/video/7400000000000000001?u=https%3A%2F%2Fevil.test",
+     "https://www.tiktok.com/share/video/7400000000000000001"),
+    ("https://www.tiktok.com/@a.b/video/7400000000000000001?_r=1&x=https%3A%2F%2Fevil.test",
+     "https://www.tiktok.com/@a.b/video/7400000000000000001"),
+    ("https://m.youtube.com/watch?v=dQw4w9WgXcQ&redir=https%3A%2F%2Fevil.test",
+     "https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+    ("https://instagram.com/someone/reel/Rk3elTest01/?next=https%3A%2F%2Fevil.test",
+     "https://www.instagram.com/p/Rk3elTest01/"),
+])
+def test_an_id_bearing_link_reaches_the_tools_as_the_bare_post_link(
+    post: Callable[..., Run], given: str, read_as: str
+) -> None:
+    run = post("read", given, scenario={"yt-dlp": [{"exit": 1, "stderr": "ERROR: Video unavailable"}]})
+    assert run.called("yt-dlp")[0][-1] == read_as
+    assert "evil.test" not in json.dumps(run.calls)
