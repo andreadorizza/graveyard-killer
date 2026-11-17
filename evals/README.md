@@ -45,6 +45,33 @@ The reel and the carousel are public posts; the reel's two links are the same po
 
 About 15 sessions use up Notion's hourly query allowance on plans below Business: run the Notion evals in batches.
 
+### On OpenCode's free models
+
+The free route runs the Worker in OpenCode ([ADR-0007](../docs/adr/0007-a-free-worker-in-opencode.md)), so the runner can run any eval there instead of in `claude -p`, against the Notion test Library only:
+
+```
+python3 evals/run_evals.py --agent opencode --model opencode/glm-5.3-flash-free notion worker 1 3 12
+python3 evals/run_evals.py --agent opencode --model opencode/glm-5.3-flash-free notion resume worker-12 "sì, sempre"
+```
+
+- **Before the first run,** sign OpenCode in to Notion once: `opencode mcp auth notion`. The sign-in lives in OpenCode's data folder, which the runner leaves as it is.
+- **The model** is `provider/model`. `opencode models opencode` lists the Zen models; the free ones end in `-free`. The free route uses `opencode/glm-5.3-flash-free` and `opencode/deepseek-v4.1-flash-free`, the two that keep no data and train on nothing.
+- **Another OpenCode,** such as a 2.x build, goes in `--opencode-bin` or `OPENCODE_BIN`. The runner is tested on OpenCode 1.19.5.
+
+Each eval runs in a fresh `opencode run --auto --format json -m <model>`, in a run folder outside the repo that holds the test pointer in `AGENTS.md` and an `opencode.json`. This branch's skills sit next to the run folder, outside it as a user's installed skills are, registered with `skills.paths` in a folder that is not hidden: OpenCode 1.19's glob finds nothing under `.agents`.
+
+The `opencode.json` is the one `schedule.py` writes for a scheduled run, so the evals test the rules users get. `--auto` approves every permission that is not denied, and a post is untrusted input, so every rule denies first and then allows only what a Worker run needs: reading the run folder, the skills and `post.py`'s work folders, the skill's exact script calls in Bash, web fetch and Notion. No edits, no subagents, no web search, no questions. If an eval fails on one of these rules, fix the rule in `schedule.py`, for users too.
+
+The runner also keeps your own OpenCode setup out of the session:
+
+- `OPENCODE_DISABLE_CLAUDE_CODE=1`: OpenCode does not load `~/.claude/CLAUDE.md`, with your real pointer.
+- `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`: it skips `~/.claude/skills` and `~/.agents/skills`, so an installed copy of the skills never mixes with this branch's.
+- `XDG_CONFIG_HOME` points at an empty folder in `gk-evals/opencode/config`, so a global `AGENTS.md` pointer, which Setup on the free route writes, never loads. The runner stops if one appears there.
+- `OPENCODE_DB` gives the eval sessions their own database. Two OpenCode processes on one database fail with "database is locked", for example an eval and a scheduled Worker run.
+- `PWD` is the run folder. OpenCode 1.19 takes its project folder from `PWD`, not from the process's working folder.
+
+Runs land in `gk-evals/opencode/<model>/notion/<run>/`, with a `stats.json` that holds the minutes, the model steps, the tokens and the failed tool calls. A free model is slow, and each step sends the whole conversation again, starting at about 70,000 input tokens for the instructions, the tools and Notion's tool list.
+
 ## Capture (`capture.json`)
 
 **Memory.** Every eval except 12 runs with the pointer in place. Keep the pointer out of the prompt: the skill reads the first link in the user's message, so a Library link in the prompt would be filed as the post. The runner runs eval 12 with no pointer.

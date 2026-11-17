@@ -4,6 +4,7 @@
     post.py read [<link>] [--language <code>]   the link comes on stdin when left out
     post.py clean <folder>           delete a work folder that read made
     post.py pause                    wait a random 6 to 12 seconds, between Instagram posts
+    post.py notify                   show a desktop notification: a title, then one line, on stdin
 
 Calls yt-dlp, gallery-dl, ffmpeg, ffprobe, Parakeet and Whisper as outside
 programs found on PATH. When Windows Smart App Control blocks a tool that uv
@@ -49,6 +50,7 @@ MINUTE = 60
 TIME_LIMITS = {"yt-dlp": 20 * MINUTE, "gallery-dl": 10 * MINUTE, "uv": 5 * MINUTE,
                "ffmpeg": 15 * MINUTE, "ffprobe": 2 * MINUTE}
 SPEECH_TIME_LIMIT = 60 * MINUTE  # Parakeet or Whisper, on a long video and a slow computer
+NOTIFY_TIME_LIMIT = 30  # seconds for osascript, notify-send or PowerShell to show one notification
 # Seconds between Instagram posts, as gallery-dl waits between Instagram requests (ADR 0001).
 PAUSE = (6.0, 12.0)
 AT_MOST_720P = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
@@ -669,6 +671,52 @@ def new_work_folder() -> Path:
     return folder.resolve()
 
 
+# A toast from Windows PowerShell 5.1, which loads the WinRT types (PowerShell 7 does not). The
+# text arrives in environment variables and goes in as XML text nodes, so PowerShell never parses
+# it. A toast needs a registered app id; this one is Windows PowerShell's own.
+WINDOWS_TOAST = r"""
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
+$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$texts = $xml.GetElementsByTagName('text')
+$texts.Item(0).AppendChild($xml.CreateTextNode($env:GK_NOTIFY_TITLE)) > $null
+$texts.Item(1).AppendChild($xml.CreateTextNode($env:GK_NOTIFY_MESSAGE)) > $null
+$app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($xml))
+"""
+# macOS: the text is the script's arguments, never part of the script.
+MAC_NOTIFICATION = ("on run argv", "display notification (item 2 of argv) with title (item 1 of argv)", "end run")
+
+
+def notify(title: str, message: str) -> dict[str, Any]:
+    """Show a notification on this computer, for a Ping when the agent has no push tool.
+
+    The text reaches the system as arguments or environment variables, never inside a script
+    or a shell command, so nothing in it is expanded. A zero exit means the system took the
+    notification, not that the user saw it: macOS may have notifications off for the app that
+    shows it (Script Editor, for osascript).
+    """
+    env = None
+    if system() == "Darwin":
+        command = ["osascript", *(part for line in MAC_NOTIFICATION for part in ("-e", line)), title, message]
+    elif system() == "Windows":
+        command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", WINDOWS_TOAST]
+        env = {**os.environ, "GK_NOTIFY_TITLE": title, "GK_NOTIFY_MESSAGE": message}
+    else:  # Linux and the other systems with a freedesktop notification server
+        command = ["notify-send", "--app-name=Graveyard Killer", "--", title, message]
+    program = shutil.which(command[0])
+    if program is None:
+        hint = " (on Debian or Ubuntu: sudo apt install libnotify-bin)" if command[0] == "notify-send" else ""
+        return {"notified": False, "reason": f"{command[0]} is not on this computer{hint}"}
+    try:
+        result = run([program, *command[1:]], capture_output=True, text=True, timeout=NOTIFY_TIME_LIMIT, env=env)
+    except (OSError, ToolTimedOut) as failed:
+        return {"notified": False, "reason": str(failed)}
+    if result.returncode != 0:
+        lines = (result.stderr or "").strip().splitlines()
+        return {"notified": False, "reason": lines[-1] if lines else f"{command[0]} exited with {result.returncode}"}
+    return {"notified": True}
+
+
 def pause() -> dict[str, float]:
     """Wait a random PAUSE. A shell sleep with $RANDOM, or python3 -c, needs approval where only
     the skill's own scripts may run. GK_PAUSE_SCALE shortens the wait (for the tests)."""
@@ -685,6 +733,7 @@ def main() -> None:
     read_parser.add_argument("--language", help="the spoken language when known, such as it")
     commands.add_parser("check")
     commands.add_parser("pause")
+    commands.add_parser("notify", help="a title on the first line of stdin, the message on the next")
     clean_parser = commands.add_parser("clean")
     clean_parser.add_argument("folder", type=Path)
     args = parser.parse_args()
@@ -692,6 +741,12 @@ def main() -> None:
         print(json.dumps(check()))
     elif args.command == "pause":
         print(json.dumps(pause()))
+    elif args.command == "notify":
+        lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
+        if len(lines) < 2:
+            print(json.dumps({"notified": False, "reason": "stdin needs a title line and a message line"}))
+            sys.exit(2)
+        print(json.dumps(notify(lines[0], " ".join(lines[1:]))))
     elif args.command == "clean":
         result = clean(args.folder)
         print(json.dumps(result))

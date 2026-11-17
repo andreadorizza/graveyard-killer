@@ -6,7 +6,7 @@ You came here from SKILL.md's step 3 ([read the Settings](../SKILL.md#3-read-the
 
 - **A Worker run,** or **Setup** for a Library made elsewhere, brings an older Library up to date before its job, as [Upgrade](#upgrade) says.
 - **Any other job** changes nothing here. It reads an older Library as the steps describe: what a step would add counts as its default, and what a step would replace counts as its replacement. So a phone Capture stays one quick turn.
-- **A Library newer than this skill,** whose Version is newer than the newest heading below: another computer or device runs a newer Graveyard Killer. Change nothing here, and do the job with what you understand. In a Worker run, add a fix to the Ping; in Setup, tell the user: this computer runs an older Graveyard Killer than the Library, so update it in *Customize → Plugins → Check for updates*.
+- **A Library newer than this skill,** whose Version is newer than the newest heading below: another computer or device runs a newer Graveyard Killer. Change nothing here, and do the job with what you understand. In a Worker run, add a fix to the Ping; in Setup, tell the user: this computer runs an older Graveyard Killer than the Library, so update it in *Customize → Plugins → Check for updates*, or in OpenCode by saying "update Graveyard Killer".
 
 ## Upgrade
 

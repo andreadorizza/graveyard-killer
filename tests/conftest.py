@@ -16,7 +16,8 @@ import pytest
 
 SCRIPT = Path(__file__).parent.parent / "plugin/skills/graveyard-killer/scripts/post.py"
 FAKE = Path(__file__).parent / "fakes/fake_tool.py"
-FAKE_NAMES = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2", "uv")
+FAKE_NAMES = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2", "uv",
+              "osascript", "notify-send", "powershell")
 
 
 def link_or_copy(source: str | Path, target: Path) -> None:

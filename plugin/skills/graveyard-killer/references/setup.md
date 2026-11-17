@@ -1,6 +1,6 @@
 # Setup
 
-Setup is a conversation on the user's computer, in the Claude Desktop Code tab, after the plugin is added. At the end the user has their own Library, the tools, the scheduled Worker, saving from the phone and a way to get Pings. The user is probably not technical, so do the work yourself. Explain each step in a line, and ask one thing at a time. Setup runs once, on whatever model the user picked; only the Worker is pinned to Sonnet.
+Setup is a conversation on the user's computer, in the Claude Desktop Code tab after the plugin is added, or in OpenCode, on a free model, after its [Install](opencode.md#install). In OpenCode, read [opencode.md](opencode.md) first: its [Setup in OpenCode](opencode.md#setup-in-opencode) replaces the steps below that name Claude Desktop. At the end the user has their own Library, the tools, the scheduled Worker, saving from the phone and a way to get Pings. The user is probably not technical, so do the work yourself. Explain each step in a line, and ask one thing at a time. Setup runs once, on whatever model the user picked; only the Worker is pinned to Sonnet.
 
 Setup starts when the user asks to set up Graveyard Killer, or when a Graveyard Killer job finds no Library. It does not need an existing Library, so skip SKILL.md's steps 2 and 3. Talk in the language the user writes in. It becomes the Settings language: say so in your first question, so the user can pick another.
 
