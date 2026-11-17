@@ -17,7 +17,7 @@ The Obsidian steps of [setup.md](setup.md). Read [library-obsidian.md](library-o
 
 5. **Write the Settings.** `vault.py create "<Library>" "Settings"` with an input file holding `{"body": "..."}`: every section of [library.md](library.md#the-settings) in order, as Markdown headings and tables, then the Files section of [library-obsidian.md](library-obsidian.md#layout). Done when `vault.py read "<Library>/Settings.md"` gives them back, and the note is named exactly `Settings`.
    - The Fields table also names Cover, with a name of one word, such as "Copertina", and names Tags `tags`.
-   - The Limits start at 20 per day and 100 per week, and the Version is the newest heading in [upgrade.md](upgrade.md#steps).
+   - The Limits start at 20 per day and 100 per week, the Instagram login with "Browser" empty and "Reads per run" at 3, and the Version is the newest heading in [upgrade.md](upgrade.md#steps).
    - The Schedule and "Ping by" stay empty until Setup's steps 3 and 9, and the Preferences table holds only its header row.
 
 The Library link, for the pointer, is the Library folder's absolute path, as `vault.py check "<Library>"` prints it in `path`.

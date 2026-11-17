@@ -1,32 +1,54 @@
-"""Run the Graveyard Killer evals headless, one fresh `claude -p` session each.
+"""Run the Graveyard Killer evals headless, one fresh agent session each.
 
 Usage:
-    python3 evals/run_evals.py <app> <capture|worker|drive|obsidian> <id> [<id> ...]
-    python3 evals/run_evals.py <app> resume <run> "<reply>"
-    python3 evals/run_evals.py <app> prompt <run> "<prompt>"
+    python3 evals/run_evals.py [--agent claude|opencode] [--model <provider/model>] [--fake-posts|--live-posts] <app> <capture|worker|drive|obsidian> <id> [<id> ...]
+    python3 evals/run_evals.py [--agent ...] [--model ...] [--fake-posts|--live-posts] <app> resume <run> "<reply>"
+    python3 evals/run_evals.py [--agent ...] [--model ...] [--fake-posts|--live-posts] <app> prompt <run> "<prompt>"
 
 <app> is `notion`, `google-drive` or `obsidian`. `resume` answers a finished run in its own
 session. `prompt` runs any message against the test Library, for example to seed it.
 
-Each run writes <temp folder>/gk-evals/<app>/<run>/: out.jsonl (the session's stream),
-result.txt (its final message), session.txt and expectations.md (what to grade).
+The agent is `claude` (`claude -p`, the default), `opencode` (`opencode run`, Notion only),
+which needs `--model`, such as `opencode/glm-5.3-flash-free`, or `codex` (`codex exec`, Notion
+only), whose `--model` defaults to the scheduled task's, gpt-6-luna. `--opencode-bin`, or
+OPENCODE_BIN, names another OpenCode command; `--codex-bin`, or CODEX_BIN, another Codex.
+
+Posts are fake by default: the run puts stand-ins for yt-dlp, gallery-dl and the speech engines
+first on PATH, and they answer from the recorded posts in evals/fixtures/posts, so nothing is
+downloaded. The evals in LIVE_POSTS, which test the platforms themselves, read real posts, as does
+any run given --live-posts; --fake-posts fakes them too. A resumed run keeps the posts it started with.
+
+
+Each run writes <temp folder>/gk-evals/<app>/<run>/, or gk-evals/<agent>/<model>/<app>/<run>/:
+out.jsonl (the session's stream), result.txt (its final message), session.txt,
+expectations.md (what to grade), posts.txt (fake or live), fakes/calls.jsonl (each fake tool's call)
+and, for OpenCode and Codex, stats.json (time, steps, tokens).
 evals/local.json, which is not committed, holds each app's test Library link and
 the placeholders' values; see evals/README.md.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import pathlib
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+from collections.abc import Iterator
 from typing import IO, Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "plugin/skills/graveyard-killer/scripts"))
+import schedule  # noqa: E402  The scheduled run folder's opencode.json, which the OpenCode evals reuse.
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent
+HOME = pathlib.Path.home()
 # Outside the repo, so the eval sessions load none of its CLAUDE.md or AGENTS.md.
 RUNS = pathlib.Path(tempfile.gettempdir()) / "gk-evals"
 
@@ -40,12 +62,14 @@ APPS: dict[str, dict[str, Any]] = {
     # A folder in a test vault: no connector, only the skill's vault script.
     "obsidian": {"name": "Obsidian", "tools": [], "servers": []},
 }
-# A session whose app connectors are still pending, or missing, when it starts fails to reach the Library
-# (seen on 2026-11-13). The runner stops such a session at once and starts it again, this many times in all.
+# A session whose app connectors are missing when it starts fails to reach the Library (seen on 2026-11-13).
+# The runner stops such a session at once and starts it again, this many times in all. Since Claude Code
+# 2.1.322 a claude.ai connector is still pending when the session starts and connects seconds later
+# (2026-11-16), so pending passes.
 ATTEMPTS = 3
 NO_MEMORY = {("capture", 12)}
 SETTINGS = json.dumps(
-    {"claudeMdExcludes": [str(pathlib.Path.home() / ".claude" / "CLAUDE.md"), str(pathlib.Path.home() / ".claude" / "projects") + "/**"]}
+    {"claudeMdExcludes": [str(HOME / ".claude" / "CLAUDE.md"), str(HOME / ".claude" / "projects") + "/**"]}
 )
 # Posts are untrusted input, so the sessions may run the skill's own scripts only, not any python3.
 SCRIPTS = REPO / "plugin" / "skills" / "graveyard-killer" / "scripts"
@@ -55,7 +79,26 @@ ALLOWED = ["Skill", "ToolSearch", "Read", "Glob", "Grep", "WebFetch", "Bash(slee
 # ~/.claude holds the user's own CLAUDE.md, with the pointer to their real Library. claudeMdExcludes keeps
 # it out of the context, but an agent that finds no pointer will search for one, so it must not read there.
 DISALLOWED = ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar", "PushNotification", "Write", "Edit",
-              f"Read(/{pathlib.Path.home()}/.claude/**)"]  # A Read rule covers Grep and Glob too.
+              f"Read(/{HOME}/.claude/**)"]  # A Read rule covers Grep and Glob too.
+
+# Fake posts: stand-ins for the tools that download and transcribe, answering from recorded posts.
+FAKE_TOOLS = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2")
+FAKE_SOURCE = HERE / "fakes" / "post_tools.py"
+FIXTURES = HERE / "fixtures" / "posts"
+FAKE_POSTS_ON = "GK_FAKE_POSTS"  # set while a session runs with the stand-ins
+# A post.py read that ended "ok" on a platform, as it appears, JSON-escaped or not, in a session's stream.
+READ_OK = re.compile(r'\\*"status\\*": \\*"ok\\*", \\*"platform\\*": \\*"(?:instagram|tiktok|youtube)')
+# Evals that test the platforms themselves, so they read real posts: TikTok's short links (2, 4), how
+# YouTube reports a missing video (5) and Instagram's posts for signed-in users only (13, 14, 19).
+LIVE_POSTS = {("worker", 2), ("worker", 4), ("worker", 5), ("worker", 13), ("worker", 14), ("worker", 19)}
+
+# OpenCode: the free route is Notion only (ADR-0007).
+OPENCODE_APPS = {"notion"}
+OPENCODE_TIMEOUT = 7200  # A free model is slow: the #17 prototype took 42 minutes for 4 Entries.
+# Codex: Notion only too (ADR-0008). The ChatGPT app bundles its own `codex` on macOS.
+CODEX_APPS = {"notion"}
+CODEX_TIMEOUT = 7200
+CODEX_APP_CLI = pathlib.Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex")
 
 
 def load_local() -> dict[str, Any]:
@@ -73,6 +116,8 @@ def fill(text: str, app: str, placeholders: dict[str, str]) -> str:
     return text
 
 
+# --- Claude Code ---------------------------------------------------------------------------------
+
 def command(app: str, prompt: str) -> list[str]:
     allowed = [*ALLOWED, *APPS[app]["tools"]]
     disallowed = [*DISALLOWED, *(t for other, spec in APPS.items() if other != app for t in spec["tools"])]
@@ -86,9 +131,9 @@ def command(app: str, prompt: str) -> list[str]:
 
 
 def connectors_ready(event: dict[str, Any], app: str) -> bool:
-    """Whether a session's init event shows every connector of the app as connected."""
+    """Whether a session's init event shows every connector of the app as connected or connecting."""
     status = {server.get("name"): server.get("status") for server in event.get("mcp_servers", [])}
-    return all(status.get(name) == "connected" for name in APPS[app]["servers"])
+    return all(status.get(name) in ("connected", "pending") for name in APPS[app]["servers"])
 
 
 def attempt(cmd: list[str], cwd: pathlib.Path, out: IO[str], app: str) -> str:
@@ -156,36 +201,546 @@ def prepare(app: str, name: str, library: str, memory: bool) -> pathlib.Path:
     return folder
 
 
+# --- OpenCode ------------------------------------------------------------------------------------
+
+def opencode_base(model: str) -> pathlib.Path:
+    return RUNS / "opencode" / re.sub(r"[^A-Za-z0-9.-]+", "-", model)
+
+
+def opencode_env() -> dict[str, str]:
+    """Keep the user's own OpenCode setup out: its global config, its sessions and every skill outside the run folder.
+
+    OPENCODE_DISABLE_CLAUDE_CODE keeps ~/.claude/CLAUDE.md, with the real Library pointer, out of the
+    context. OPENCODE_DISABLE_EXTERNAL_SKILLS skips ~/.claude/skills and ~/.agents/skills, so a skill
+    installed by Setup never mixes with this branch's. XDG_CONFIG_HOME moves the global config, where
+    Setup puts its AGENTS.md pointer, to an empty folder. OPENCODE_DB keeps the eval sessions in their
+    own database: OpenCode runs that share one fail with "database is locked". The data folder, which
+    holds the Notion sign-in from `opencode mcp auth notion`, stays the user's own.
+    """
+    shared = RUNS / "opencode"
+    config = shared / "config"
+    pointer = config / "opencode" / "AGENTS.md"
+    if pointer.exists():
+        sys.exit(f"{pointer} must not exist: the eval sessions' only pointer is the run folder's AGENTS.md")
+    config.mkdir(parents=True, exist_ok=True)
+    return {**os.environ, "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
+            "OPENCODE_DISABLE_AUTOUPDATE": "1", "XDG_CONFIG_HOME": str(config),
+            "OPENCODE_DB": str(shared / "opencode.db")}
+
+
+def opencode_config(cwd: pathlib.Path, skills: pathlib.Path, model: str, library: str) -> dict[str, Any]:
+    """The run folder's opencode.json: the one schedule.py writes for a scheduled run, so the evals test the
+    rules users get, plus `skills.paths` for this branch's skills.
+
+    `opencode run --auto` approves every permission that is not denied, and a post is untrusted input.
+    schedule.py's rules deny first and then allow only the run folder, the skills and post.py's work
+    folders for reading, the skill's exact script calls in Bash, web fetch and Notion.
+    """
+    job = schedule.Job(name="gk-eval", time="13:00", days=[], model=model, fallback_model=None,
+                       folder=str(cwd.resolve()), library=library,
+                       script=str(skills.resolve() / "graveyard-killer" / "scripts" / "schedule.py"),
+                       temp=tempfile.gettempdir())
+    config: dict[str, Any] = schedule.opencode_config(job)
+    config["skills"] = {"paths": [str(skills.resolve())]}
+    return config
+
+
+def opencode_prepare(model: str, app: str, name: str, library: str, memory: bool) -> pathlib.Path:
+    """A fresh run folder, cwd/, with the pointer in AGENTS.md and opencode.json, and this branch's skills
+    next to it in skills/, outside the run folder as a user's installed skills are.
+
+    With the skills inside the run folder, schedule.py's rules denied reading them (OpenCode 1.19.5,
+    2026-11-16). The skills folder is not hidden: OpenCode 1.19's glob finds nothing under `.agents`.
+    """
+    folder = opencode_base(model) / app / name
+    cwd, skills = folder / "cwd", folder / "skills"
+    cwd.mkdir(parents=True, exist_ok=True)
+    for old in (skills, cwd / "skills"):  # cwd/skills: where the skills went before
+        shutil.rmtree(old, ignore_errors=True)
+    shutil.copytree(REPO / "plugin" / "skills", skills, ignore=shutil.ignore_patterns("__pycache__"))
+    pointer = cwd / "AGENTS.md"
+    if memory:
+        pointer.write_text(f"Graveyard Killer Library: {library}\n", encoding="utf-8")
+    else:
+        pointer.unlink(missing_ok=True)
+    config = opencode_config(cwd, skills, model, library)
+    (cwd / "opencode.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return folder
+
+
+def opencode_command(binary: str, model: str, prompt: str, session: str = "") -> list[str]:
+    # The run folder is the process's working folder, not `--dir`, which OpenCode 2.x may not have.
+    # --print-logs at ERROR puts the model's errors, such as "Free usage limit reached", in the stream:
+    # `opencode run` shows them nowhere else, and after one it waits with no output and does not exit.
+    return [binary, "run", "--auto", "--format", "json", "--print-logs", "--log-level", "ERROR", "-m", model,
+            *(["-s", session] if session else []), prompt]
+
+
+def here(env: dict[str, str], cwd: pathlib.Path) -> dict[str, str]:
+    """The environment for a process in cwd. OpenCode 1.19 takes its project folder from PWD, not from the
+    process's working folder: with the runner's own PWD, a session ran in the repo and never saw AGENTS.md."""
+    return {**env, "PWD": str(cwd)}
+
+
+def opencode_ready(binary: str, cwd: pathlib.Path, env: dict[str, str]) -> bool:
+    """Whether `opencode mcp list` shows the Notion server as connected in the run folder."""
+    listing = subprocess.run([binary, "mcp", "list"], cwd=cwd, env=here(env, cwd), capture_output=True, text=True,
+                             stdin=subprocess.DEVNULL, timeout=120)
+    text = re.sub(r"\x1b\[[0-9;]*m", "", listing.stdout + listing.stderr).lower()
+    lines = [line for line in text.splitlines() if "notion" in line and "http" not in line]
+    return any("connected" in line and not any(bad in line for bad in ("not connected", "disconnected", "failed", "needs"))
+               for line in lines)
+
+
+def opencode_attempt(cmd: list[str], cwd: pathlib.Path, env: dict[str, str], out: IO[str]) -> str:
+    """Stream one session into out. Return "done", "timeout", "exit <code>", "locked", or the model's error.
+
+    "locked" and a model error before the first step can be tried again; a model error later cannot,
+    since the run has already changed the Library.
+    """
+    proc = subprocess.Popen(cmd, cwd=cwd, env=here(env, cwd), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, encoding="utf-8")
+    timer = threading.Timer(OPENCODE_TIMEOUT, proc.kill)
+    timer.start()
+    locked, steps, error = False, 0, ""
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            out.write(line)
+            out.flush()
+            locked = locked or "database is locked" in line
+            steps += '"type":"step_finish"' in line
+            if "stream error" in line and "level=ERROR" in line:
+                found = re.search(r'error\.error="([^"]*)"', line)
+                error = found.group(1) if found else "stream error"
+                proc.kill()
+                break
+        proc.wait()
+        if not timer.is_alive():
+            return "timeout"
+        if error:
+            return f"model error{'' if steps else ' at start'}: {error}"
+        if locked and proc.returncode:
+            return "locked"
+        return f"exit {proc.returncode}" if proc.returncode else "done"
+    finally:
+        timer.cancel()
+
+
+def opencode_stats(lines: list[str]) -> tuple[str, str, dict[str, Any]]:
+    """The session, its final message and its counts, from `opencode run --format json` events."""
+    session, last_message = "", ""
+    texts: dict[str, list[str]] = {}
+    stats: dict[str, Any] = {"steps": 0, "tool_calls": 0, "tool_errors": 0, "errors": [],
+                             "tokens": {"input": 0, "output": 0, "reasoning": 0, "cache_read": 0}, "last_input": 0}
+    first = last = 0
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        session = event.get("sessionID", session)
+        stamp = event.get("timestamp")
+        if isinstance(stamp, int):
+            first, last = first or stamp, stamp
+        part = event.get("part") or {}
+        kind = event.get("type")
+        if kind == "text":
+            message = part.get("messageID", "")
+            texts.setdefault(message, []).append(part.get("text", ""))
+            last_message = message
+        elif kind == "tool_use":
+            stats["tool_calls"] += 1
+            stats["tool_errors"] += (part.get("state") or {}).get("status") == "error"
+        elif kind == "step_finish":
+            stats["steps"] += 1
+            tokens = part.get("tokens") or {}
+            for key in ("input", "output", "reasoning"):
+                stats["tokens"][key] += int(tokens.get(key) or 0)
+            stats["tokens"]["cache_read"] += int((tokens.get("cache") or {}).get("read") or 0)
+            stats["last_input"] = int(tokens.get("input") or 0)
+        elif kind == "error":
+            stats["errors"].append(event.get("error") or part)
+    stats["minutes"] = round((last - first) / 60000, 1) if first else 0
+    return session, "\n".join(texts.get(last_message, [])).strip(), stats
+
+
+def opencode_run(folder: pathlib.Path, cmd: list[str], env: dict[str, str], binary: str, model: str,
+                 resume: bool = False) -> None:
+    """Run one session in OpenCode. A resumed session adds to the run's stream; a new run starts it again."""
+    cwd = folder / "cwd"
+    for number in range(1, ATTEMPTS + 1):
+        if opencode_ready(binary, cwd, env):
+            break
+        print(f"--- {folder.name}: Notion not connected, try {number} of {ATTEMPTS}", flush=True)
+        time.sleep(15)
+    else:
+        print(f"=== {folder.name}: Notion is not connected. Run `opencode mcp auth notion` once.", flush=True)
+        return
+    started = time.monotonic()
+    with open(folder / "out.jsonl", "a" if resume else "w", encoding="utf-8") as out:
+        for number in range(1, ATTEMPTS + 1):
+            start = out.tell()
+            outcome = opencode_attempt(cmd, cwd, env, out)
+            if outcome != "locked" and not outcome.startswith("model error at start"):
+                break
+            out.truncate(start)
+            out.seek(start)
+            print(f"--- {folder.name}: {outcome}, try {number} of {ATTEMPTS}", flush=True)
+            time.sleep(15 if outcome == "locked" else 120)
+    lines = (folder / "out.jsonl").read_text(encoding="utf-8").splitlines()
+    session, result, stats = opencode_stats(lines)
+    stats.update({"agent": "opencode", "model": model, "session": session, "outcome": outcome,
+                  "wall_minutes": round((time.monotonic() - started) / 60, 1)})
+    (folder / "result.txt").write_text(result, encoding="utf-8")
+    (folder / "session.txt").write_text(session, encoding="utf-8")
+    (folder / "stats.json").write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
+    tokens = stats["tokens"]
+    print(f"=== {folder.name} on {model} (session {session}): {outcome}, {stats['wall_minutes']} min, "
+          f"{stats['steps']} steps, {tokens['input']} input and {tokens['output']} output tokens, "
+          f"{stats['tool_errors']} of {stats['tool_calls']} tool calls failed\n{result}\n", flush=True)
+
+
+# --- Codex ---------------------------------------------------------------------------------------
+
+def codex_base(model: str) -> pathlib.Path:
+    return RUNS / "codex" / re.sub(r"[^A-Za-z0-9.-]+", "-", model)
+
+
+def codex_binary(given: str) -> str:
+    """--codex-bin or CODEX_BIN, then `codex` on PATH, then the ChatGPT app's own."""
+    found = given or shutil.which("codex") or (str(CODEX_APP_CLI) if CODEX_APP_CLI.exists() else "")
+    if not found:
+        sys.exit("Codex is not installed: install the ChatGPT desktop app, or name a `codex` with --codex-bin.")
+    return found
+
+
+def codex_home() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("CODEX_HOME") or HOME / ".codex")
+
+
+def codex_check_home() -> None:
+    """Codex reads ~/.codex/AGENTS.md in every chat, and Setup puts the user's pointer there."""
+    for name in ("AGENTS.override.md", "AGENTS.md"):
+        found = codex_home() / name
+        if found.exists() and "Graveyard Killer Library:" in found.read_text(encoding="utf-8"):
+            sys.exit(f"{found} holds a Graveyard Killer pointer: the eval sessions' only pointer must be the run "
+                     "folder's AGENTS.md. Move it aside while the evals run.")
+
+
+def codex_installed_skills() -> list[str]:
+    """`-c` options that switch off a copy of the skills installed in ~/.agents/skills, which Codex
+    reads in every folder, so that only this branch's copy in the run folder loads."""
+    paths = [HOME / ".agents" / "skills" / name / "SKILL.md" for name in ("graveyard-killer", "graveyard-killer-worker")]
+    entries = [f"{{path = {json.dumps(str(path))}, enabled = false}}" for path in paths if path.exists()]
+    return ["-c", f"skills.config=[{', '.join(entries)}]"] if entries else []
+
+
+def codex_prepare(model: str, app: str, name: str, library: str, memory: bool) -> pathlib.Path:
+    """A fresh run folder, cwd/, as `schedule.py codex` writes it for a scheduled task, with this branch's
+    skills in its .agents/skills, where Codex finds a folder's own skills.
+
+    The folder's .codex/config.toml and rules are the ones users get: commands read only the skills and
+    the folder and reach no network, and only the skills' scripts, by full path, run outside the sandbox.
+    schedule.py also marks the folder as trusted in Codex's config, since Codex ignores an untrusted
+    folder's .codex.
+    """
+    folder = codex_base(model) / app / name
+    cwd = folder / "cwd"
+    skills = cwd / ".agents" / "skills"
+    shutil.rmtree(skills, ignore_errors=True)
+    shutil.rmtree(cwd / schedule.CODEX_WORK, ignore_errors=True)
+    shutil.copytree(REPO / "plugin" / "skills", skills, ignore=shutil.ignore_patterns("__pycache__"))
+    pointer = cwd / "AGENTS.md"
+    pointer.write_text(f"Graveyard Killer Library: {library}\n" if memory else "", encoding="utf-8")
+    schedule.prepare_codex_folder(cwd, library, skills.resolve())
+    return folder
+
+
+def codex_command(binary: str, model: str, prompt: str, session: str = "") -> list[str]:
+    # `codex exec` never asks for an approval: what the run folder's sandbox refuses fails, as in a
+    # scheduled task. --skip-git-repo-check: the run folder is in no git repository.
+    options = ["--json", "--skip-git-repo-check", "-c", f"model={json.dumps(model)}", *schedule.codex_exec_options(),
+               *codex_installed_skills()]
+    if os.environ.get(FAKE_POSTS_ON):
+        # Codex runs commands in a login shell, whose profile can put Homebrew's yt-dlp ahead of the
+        # stand-ins on PATH: on 2026-11-17 that read two real posts. A non-login shell keeps PATH as given.
+        options += ["-c", "allow_login_shell=false"]
+    return [binary, "exec", *options, *(["resume", session] if session else []), prompt]
+
+
+def codex_attempt(cmd: list[str], cwd: pathlib.Path, out: IO[str]) -> str:
+    """Stream one session into out. Return "done", "timeout" or "exit <code>"."""
+    proc = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, encoding="utf-8")
+    timer = threading.Timer(CODEX_TIMEOUT, proc.kill)
+    timer.start()
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            out.write(line)
+            out.flush()
+        proc.wait()
+        if not timer.is_alive():
+            return "timeout"
+        return f"exit {proc.returncode}" if proc.returncode else "done"
+    finally:
+        timer.cancel()
+
+
+def codex_stats(lines: list[str]) -> tuple[str, str, dict[str, Any]]:
+    """The session, its final message and its counts, from `codex exec --json` events."""
+    session, result = "", ""
+    stats: dict[str, Any] = {"turns": 0, "commands": 0, "failed_commands": [], "mcp_calls": 0, "failed_mcp_calls": [],
+                             "web_searches": 0, "images_viewed": 0, "errors": [],
+                             "tokens": {"input": 0, "cached_input": 0, "output": 0, "reasoning": 0}}
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        kind = event.get("type")
+        item = event.get("item") or {}
+        if kind == "thread.started":
+            session = session or str(event.get("thread_id", ""))
+        elif kind == "turn.completed":
+            stats["turns"] += 1
+            usage = event.get("usage") or {}
+            for key, field in (("input", "input_tokens"), ("cached_input", "cached_input_tokens"),
+                               ("output", "output_tokens"), ("reasoning", "reasoning_output_tokens")):
+                stats["tokens"][key] += int(usage.get(field) or 0)
+        elif kind in ("turn.failed", "error"):
+            stats["errors"].append(event.get("error") or event.get("message") or event)
+        elif kind == "item.completed":
+            what = item.get("type")
+            if what == "agent_message":
+                result = item.get("text", "")
+            elif what == "command_execution":
+                stats["commands"] += 1
+                if item.get("exit_code"):
+                    stats["failed_commands"].append(str(item.get("command", ""))[:300])
+            elif what == "mcp_tool_call":
+                stats["mcp_calls"] += 1
+                if item.get("status") == "failed" or item.get("error"):
+                    stats["failed_mcp_calls"].append(f"{item.get('tool')}: {str(item.get('error'))[:300]}")
+            elif what == "web_search":
+                stats["web_searches"] += 1
+            elif "image" in str(what):
+                stats["images_viewed"] += 1
+    return session, result.strip(), stats
+
+
+def codex_run(folder: pathlib.Path, cmd: list[str], model: str, resume: bool = False) -> None:
+    """Run one session in Codex. A resumed session adds to the run's stream; a new run starts it again."""
+    cwd = folder / "cwd"
+    started = time.monotonic()
+    with open(folder / "out.jsonl", "a" if resume else "w", encoding="utf-8") as out:
+        outcome = codex_attempt(cmd, cwd, out)
+    session, result, stats = codex_stats((folder / "out.jsonl").read_text(encoding="utf-8").splitlines())
+    work = cwd / schedule.CODEX_WORK
+    stats.update({"agent": "codex", "model": model, "session": session, "outcome": outcome,
+                  "wall_minutes": round((time.monotonic() - started) / 60, 1),
+                  "work_folders_left": sorted(p.name for p in work.glob("graveyard-killer-*")) if work.exists() else []})
+    (folder / "result.txt").write_text(result, encoding="utf-8")
+    (folder / "session.txt").write_text(session, encoding="utf-8")
+    (folder / "stats.json").write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
+    tokens = stats["tokens"]
+    print(f"=== {folder.name} on {model} (session {session}): {outcome}, {stats['wall_minutes']} min, "
+          f"{stats['commands']} commands ({len(stats['failed_commands'])} failed), {stats['mcp_calls']} Notion calls "
+          f"({len(stats['failed_mcp_calls'])} failed), {tokens['input']} input and {tokens['output']} output tokens\n"
+          f"{result}\n", flush=True)
+
+
+# --- Fake posts ----------------------------------------------------------------------------------
+
+def install_fakes(folder: pathlib.Path) -> pathlib.Path:
+    """<folder>/fakes/bin, holding one stand-in per tool and the fakes.json they read. Their calls go
+    to <folder>/fakes/calls.jsonl, which a resumed run adds to."""
+    fakes = folder / "fakes"
+    bin_dir = fakes / "bin"
+    shutil.rmtree(bin_dir, ignore_errors=True)
+    bin_dir.mkdir(parents=True)
+    # The runner's own Python runs the stand-ins, whatever python3 comes first on the session's PATH.
+    python = sys.executable if not re.search(r"\s", sys.executable) else "/usr/bin/env python3"
+    body = FAKE_SOURCE.read_text(encoding="utf-8").split("\n", 1)[1]
+    for name in FAKE_TOOLS:
+        tool = bin_dir / name
+        tool.write_text(f"#!{python}\n{body}", encoding="utf-8")
+        tool.chmod(0o755)
+    config = {"fixtures": str(FIXTURES), "scripts": str(SCRIPTS), "log": str(fakes / "calls.jsonl")}
+    (bin_dir / "fakes.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return bin_dir
+
+
+def fake_calls(folder: pathlib.Path) -> list[dict[str, Any]]:
+    log = folder / "fakes" / "calls.jsonl"
+    if not log.exists():
+        return []
+    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+@contextlib.contextmanager
+def posts(folder: pathlib.Path, live: bool) -> Iterator[None]:
+    """Run one session with real posts, or with the stand-ins first on PATH.
+
+    PATH changes in the runner's own environment, so every agent's session gets it, and so does
+    what the session's setup records from it, as `schedule.py` records PATH for a scheduled run.
+    A shell that rebuilds PATH can still reach the real tools, so the runner warns when the session's
+    stream shows a post read that no stand-in answered.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "posts.txt").write_text("live\n" if live else "fake\n", encoding="utf-8")
+    if live:
+        shutil.rmtree(folder / "fakes", ignore_errors=True)  # a fake run's log, left in a reused run folder
+        yield
+        return
+    before = len(fake_calls(folder))
+    stream = folder / "out.jsonl"
+    seen = stream.stat().st_size if stream.exists() else 0
+    path = os.environ.get("PATH", "")
+    os.environ["PATH"] = f"{install_fakes(folder)}{os.pathsep}{path}"
+    os.environ[FAKE_POSTS_ON] = "1"
+    try:
+        yield
+    finally:
+        os.environ["PATH"] = path
+        os.environ.pop(FAKE_POSTS_ON, None)
+        calls = fake_calls(folder)[before:]
+        tools: dict[str, int] = {}
+        for call in calls:
+            tools[call["tool"]] = tools.get(call["tool"], 0) + 1
+        read = sorted({c["post"] for c in calls if c["post"]})
+        missing = sorted({c["link"] for c in calls if c["link"] and not c["post"]})
+        print(f"--- {folder.name}: fake posts, {len(calls)} tool calls "
+              f"({', '.join(f'{t} {n}' for t, n in sorted(tools.items())) or 'none'}), posts read: "
+              f"{', '.join(read) or 'none'}", flush=True)
+        if missing:
+            print(f"--- {folder.name}: no recorded post for {', '.join(missing)}: each read failed as `error`. "
+                  f"Add it to {FIXTURES.relative_to(REPO)} or run the eval with --live-posts.", flush=True)
+        text = stream.read_bytes()[seen:].decode("utf-8", "replace") if stream.exists() else ""
+        reads = len(READ_OK.findall(text))
+        answered = sum(1 for c in calls if c["tool"] == "yt-dlp" and c["post"])
+        strange = [c for c in calls if c["tool"] not in ("yt-dlp", "gallery-dl") and not c["post"]]
+        if (reads and not answered) or strange:
+            print(f"--- {folder.name}: WARNING: the real tools ran: post.py read {reads} post(s) with no stand-in "
+                  f"yt-dlp answering, or a stand-in speech engine got media that no recording holds. "
+                  f"Check PATH in the agent's shell.", flush=True)
+
+
+def live_posts(flags: dict[str, bool], folder: pathlib.Path, eval_key: tuple[str, int] | None) -> bool:
+    """--live-posts or --fake-posts when given; else what a resumed run started with; else LIVE_POSTS."""
+    if flags["live-posts"] or flags["fake-posts"]:
+        return flags["live-posts"]
+    started = folder / "posts.txt"
+    if eval_key is None and started.exists():
+        return started.read_text(encoding="utf-8").strip() == "live"
+    return eval_key in LIVE_POSTS
+
+
+# --- All -----------------------------------------------------------------------------------------
+
+FLAGS = ("fake-posts", "live-posts")
+
+
+def options(argv: list[str]) -> tuple[dict[str, str], dict[str, bool], list[str]]:
+    """Split the --agent, --model, --opencode-bin and --codex-bin options and the flags from the positional arguments."""
+    found = {"agent": "claude", "model": "", "opencode-bin": os.environ.get("OPENCODE_BIN", "opencode"),
+             "codex-bin": os.environ.get("CODEX_BIN", "")}
+    flags = {name: False for name in FLAGS}
+    rest: list[str] = []
+    args = iter(argv)
+    for arg in args:
+        name, _, value = arg.partition("=")
+        if name.startswith("--") and name[2:] in flags:
+            flags[name[2:]] = True
+        elif name.startswith("--") and name[2:] in found:
+            found[name[2:]] = value or next(args, "")
+        else:
+            rest.append(arg)
+    if all(flags.values()):
+        sys.exit("Choose one of --fake-posts and --live-posts.")
+    return found, flags, rest
+
+
 def main() -> None:
-    if len(sys.argv) < 4 or sys.argv[1] not in APPS or (sys.argv[2] in ("resume", "prompt") and len(sys.argv) != 5):
+    opts, flags, args = options(sys.argv[1:])
+    agent, model, binary = opts["agent"], opts["model"], opts["opencode-bin"]
+    if len(args) < 3 or args[0] not in APPS or (args[1] in ("resume", "prompt") and len(args) != 4):
         sys.exit(__doc__)
-    app, kind = sys.argv[1], sys.argv[2]
+    if agent not in ("claude", "opencode", "codex"):
+        sys.exit(f"Unknown agent {agent!r}: use claude, opencode or codex.")
+    app, kind = args[0], args[1]
     if kind == "drive" and app != "google-drive":
         sys.exit("drive.json runs against the Google Drive test Library only.")
     if kind == "obsidian" and app != "obsidian":
         sys.exit("obsidian.json runs against the Obsidian test Library only.")
+    if agent == "opencode" and app not in OPENCODE_APPS:
+        sys.exit("OpenCode runs against the Notion test Library only: the free route is Notion only (ADR-0007).")
+    if agent == "opencode" and "/" not in model:
+        sys.exit("OpenCode needs --model <provider/model>, such as opencode/glm-5.3-flash-free.")
+    if agent == "codex":
+        if app not in CODEX_APPS:
+            sys.exit("Codex runs against the Notion test Library only (ADR-0008).")
+        model = model or schedule.CODEX_MODEL
+        binary = codex_binary(opts["codex-bin"])
+        codex_check_home()
     local = load_local()
     library: str = local["libraries"][app]
     placeholders: dict[str, str] = local.get("placeholders", {})
 
+    def start(name: str, memory: bool, prompt: str) -> None:
+        # Inside posts(): the environment, PATH included, has the stand-ins first. opencode_env() copies it,
+        # codex exec inherits it, and schedule.prepare_codex_folder records it in the run folder.
+        if agent == "codex":
+            folder = codex_prepare(model, app, name, library, memory)
+            codex_run(folder, codex_command(binary, model, prompt), model)
+        elif agent == "opencode":
+            folder = opencode_prepare(model, app, name, library, memory)
+            opencode_run(folder, opencode_command(binary, model, prompt), opencode_env(), binary, model)
+        else:
+            folder = prepare(app, name, library, memory)
+            run(folder, command(app, prompt), app)
+
+    bases = {"claude": RUNS, "opencode": opencode_base(model) if agent == "opencode" else RUNS,
+             "codex": codex_base(model) if agent == "codex" else RUNS}
     if kind == "resume":
-        folder = RUNS / app / sys.argv[3]
+        folder = bases[agent] / app / args[2]
         session = (folder / "session.txt").read_text(encoding="utf-8").strip()
-        run(folder, [*command(app, sys.argv[4]), "--resume", session], app, resume=True)
+        with posts(folder, live_posts(flags, folder, None)):
+            if agent == "codex":
+                codex_run(folder, codex_command(binary, model, args[3], session), model, resume=True)
+            elif agent == "opencode":
+                opencode_run(folder, opencode_command(binary, model, args[3], session), opencode_env(), binary, model,
+                             resume=True)
+            else:
+                run(folder, [*command(app, args[3]), "--resume", session], app, resume=True)
         return
     if kind == "prompt":
-        folder = prepare(app, sys.argv[3], library, memory=True)
-        run(folder, command(app, fill(sys.argv[4], app, placeholders)), app)
+        folder = bases[agent] / app / args[2]
+        with posts(folder, flags["live-posts"]):
+            start(args[2], True, fill(args[3], app, placeholders))
         return
 
     evals = {e["id"]: e for e in json.loads((HERE / f"{kind}.json").read_text(encoding="utf-8"))["evals"]}
-    for eval_id in map(int, sys.argv[3:]):
+    for eval_id in map(int, args[2:]):
         spec = evals[eval_id]
-        folder = prepare(app, f"{kind}-{eval_id}", library, memory=(kind, eval_id) not in NO_MEMORY)
-        lines = [f"# {kind} {eval_id} on {APPS[app]['name']}", "", fill(spec["expected_output"], app, placeholders), ""]
+        name = f"{kind}-{eval_id}"
+        folder = bases[agent] / app / name
+        folder.mkdir(parents=True, exist_ok=True)
+        live = live_posts(flags, folder, (kind, eval_id))
+        on = {"opencode": f" in OpenCode on {model}", "codex": f" in Codex on {model}"}.get(agent, "")
+        lines = [f"# {kind} {eval_id} on {APPS[app]['name']}{on}", "", fill(spec["expected_output"], app, placeholders), ""]
         lines += [f"- {fill(x, app, placeholders)}" for x in spec["expectations"]]
+        if not live:
+            lines += ["", f"Posts were fake: each post's caption, transcript and images are the ones recorded in "
+                      f"{FIXTURES.relative_to(REPO)}/<platform>-<id>/post.json, not the live post's."]
         (folder / "expectations.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        run(folder, command(app, fill(spec["prompt"], app, placeholders)), app)
+        with posts(folder, live):
+            start(name, (kind, eval_id) not in NO_MEMORY, fill(spec["prompt"], app, placeholders))
 
 
 if __name__ == "__main__":

@@ -139,6 +139,10 @@ Move the file to "Already read", as for an adopted file. The Ping names it.
 
 Read the Link and Note cells of its row n to check it is the duplicate, then delete the row: `deleteDimension` with the dimension `ROWS`, `startIndex` n − 1 and `endIndex` n. Delete one row per call, and find the next duplicate again before deleting it, since a deleted row moves every row below it up. When you ask the user, and when you tell them it is done, say that the row is deleted, and that only the Sheet's version history can bring it back.
 
+### Add the views
+
+Do nothing: a Drive Library keeps its Sheet as it is, since Sheets shows no covers.
+
 ### Link to an Entry
 
 A Sheet has no link to one row that survives a sort. So name the Entry by its Title and give its Link, every time, such as «Pasta alla Norma» (https://it.wikipedia.org/wiki/Pasta_alla_Norma).

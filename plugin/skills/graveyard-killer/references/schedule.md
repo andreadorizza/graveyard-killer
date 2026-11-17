@@ -2,7 +2,7 @@
 
 The Worker is a scheduled task in the Claude Desktop Code tab. It runs every day at the time in the Settings, while the app is open and the computer is awake. If the computer is asleep or the app is closed at that time, the task runs at the next launch. Each run starts fresh, so its prompt carries everything it needs.
 
-You have chosen this job, found the Library and read its Settings (see SKILL.md). You need your scheduling tool, the one that creates scheduled tasks in the Code tab. Without it, tell the user that the Worker is scheduled from the Claude Desktop Code tab, and stop.
+You have chosen this job, found the Library and read its Settings (see SKILL.md). In OpenCode, follow [opencode.md](opencode.md#schedule-the-worker) instead, and in Codex, [codex.md](codex.md#schedule-the-worker). Elsewhere you need your scheduling tool, the one that creates scheduled tasks in the Code tab. Without it, tell the user that the Worker is scheduled from the Claude Desktop Code tab, from Codex in the ChatGPT desktop app, or by OpenCode on the free route, and stop.
 
 ## Steps
 

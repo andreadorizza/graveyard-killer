@@ -27,7 +27,7 @@ The Library is one folder inside a vault: the folder the pointer names. It holds
 - the **Entries** folder, with one note per Entry, named in the Settings language;
 - the **Share here** note, where the phone shares posts, and the **Already read** note, where the Worker moves each share once read, both named in the Settings language;
 - the **Attachments** folder, for the covers;
-- a Base, `<Library name>.base`, which shows the Entries as a table and as cards with their covers. The user opens it in Obsidian. Agents never read or write it.
+- a Base, `<Library name>.base`, named after the Library folder, which shows the Entries as a table and as cards with their covers. The user opens it in Obsidian. Agents write it only when it is missing, as [Add the views](#add-the-views) says, and never read or change it.
 
 Each name in the Files section is a name inside the Library folder: `<Library>/<Entries>/` and `<Library>/<Attachments>/` are folders, and `<Library>/<Share here>.md` and `<Library>/<Already read>.md` are notes.
 
@@ -119,7 +119,7 @@ Read the Settings note, change its body, and write the whole body back at once w
 
 A section replaces the one already there, such as the caption that Capture wrote from a preview, so a caption is never in the body twice.
 
-**The cover.** From the post script's `thumbnail` file, before its `clean`: `vault.py attach "<thumbnail>" "<Library>/<Attachments>" "<the note's name>"`, then set the Cover property to the `link` it prints, such as `[[Graveyard Killer/Allegati/Instagram DQx1abc.jpg]]`. With no `thumbnail`, set Cover to the `cover_url` when there is one. With neither, the Entry has no cover.
+**The cover.** From the post script's `thumbnail` file, before its `clean`: `vault.py attach "<thumbnail>" "<Library>/<Attachments>" "<the note's name>"`, then set the Cover property to the `link` it prints, such as `[[Graveyard Killer/Allegati/Instagram DQx1abc.jpg]]`. With no `thumbnail`, the Entry has no cover.
 
 ### Add a Category
 
@@ -154,6 +154,10 @@ The input file holds what [Create an Entry](#create-an-entry) would, plus `"shar
 ### Remove a duplicate
 
 `vault.py trash "<the note's path>"`: it moves the note to the vault's `.trash` folder, where Obsidian's own trash keeps deleted files. Obsidian does not list that folder, so when you ask the user, and when you tell them it is done, say that the note moves to the vault's `.trash` folder, from where they can move it back in Finder or File Explorer.
+
+### Add the views
+
+The Base is the Library's only view. Run `vault.py check "<Library>/<Library name>.base"`. If it exists, leave it as it is: the user may have changed its views. If not, write it with `vault.py new-file`, as [The Base](setup-obsidian.md#the-base) says, naming its Cards view in the Settings language (in Italian "Copertine"), and add a Cover row to the Settings' Fields table if it has none, as [Write the Settings](#write-the-settings) says. Tell the user to open the `.base` file in Obsidian.
 
 ### Link to an Entry
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stand-in for yt-dlp, gallery-dl, Parakeet, Whisper and uv in the post script's tests.
+"""Stand-in for yt-dlp, gallery-dl, Parakeet, Whisper, uv and the notification tools in the post script's tests.
 
 The tool is named by the file it runs as. Each call appends its argv to the
 log in $GK_FAKE_LOG and plays the next response for that tool from the
@@ -29,8 +29,10 @@ if tool.lower().endswith(".exe"):  # the Windows launcher made by the test fixtu
 argv = sys.argv[1:]
 
 log = Path(os.environ["GK_FAKE_LOG"])
+notify_env = {k: v for k, v in os.environ.items() if k.startswith("GK_NOTIFY_")}  # Windows' toast text
 with log.open("a") as f:
-    f.write(json.dumps({"tool": tool, "argv": argv}) + "\n")
+    f.write(json.dumps({"tool": tool, "argv": argv, "tmpdir": os.environ.get("TMPDIR"),
+                        **({"env": notify_env} if notify_env else {})}) + "\n")
 
 calls = [json.loads(line) for line in log.read_text().splitlines()]
 index = sum(1 for c in calls if c["tool"] == tool) - 1
@@ -45,8 +47,9 @@ def option(name: str) -> str | None:
     return argv[argv.index(name) + 1] if name in argv else None
 
 
+if response.get("stderr"):  # an error, or warnings from a tool that goes on
+    sys.stderr.write(response["stderr"] + "\n")
 if response.get("exit", 0):
-    sys.stderr.write(response.get("stderr", "") + "\n")
     sys.exit(response["exit"])
 
 if tool == "yt-dlp":

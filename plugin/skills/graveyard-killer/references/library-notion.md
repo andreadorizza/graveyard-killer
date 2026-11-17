@@ -6,7 +6,7 @@ How a Notion Library does each operation in [library.md](library.md#operations),
 
 The Library is one Notion page. The pointer links to it. It holds:
 
-- the **Entries** database, with one row per Entry, titled "Entries" in the Settings language. It is the only database on the Library page, which is how agents find it;
+- the **Entries** database, with one row per Entry, titled "Entries" in the Settings language. It is the only database on the Library page, which is how agents find it. Its first view is a table, which agents read through ([Querying the Entries](#querying-the-entries)), and the others come from [Add the views](#add-the-views);
 - a child page titled `Settings`, with the Settings' sections as headings and tables, as [library.md](library.md#the-settings) shows.
 
 Libraries made before version 0.4.0 also hold Digest pages, titled `Digest YYYY-MM-DD`. Leave them as they are: the Digest is now given in a chat.
@@ -19,7 +19,9 @@ Libraries made before version 0.4.0 also hold Digest pages, titled `Digest YYYY-
 | labels | multi-select |
 | date | date |
 
-Category fields are extra text properties in the Entries database. An Entry's long text is its page body. Notion shows covers: an Entry's cover is its page cover.
+Category fields are extra text properties in the Entries database. An Entry's long text is its page body.
+
+An Entry's cover is the image in its **Cover** property, a Files & media property. The Settings' Fields table names it, in a row for Notion only, after Note: `| Cover | Copertina |`. The gallery shows it. Notion's connector can point a gallery only at a property, never at the page cover, and a page cover takes only an external link, while Instagram's and TikTok's image links expire. So the Worker uploads the image to Notion (tested on 2026-11-16). Entries finished before version 0.10.0 have no Cover, and those from YouTube have a page cover instead: leave them as they are. A Library made before 0.10.0 has no Cover row or property until its next Worker run, which [adds the views](#add-the-views).
 
 The shared saves are the rows in Entries with a link and no Status: Notion's share sheet added them, or the user did by hand.
 
@@ -37,8 +39,8 @@ The shared saves are the rows in Entries with a link and no Status: Notion's sha
 On Notion plans below Business, the connector's filtered and SQL queries share an allowance that resets within the hour. Reading one of the database's views does not count against it (checked 2026-11-11). So:
 
 - Ask each question once per job and work from the answer. Never query once per post in a loop.
-- To read many Entries, such as every Link for a Graveyard import, page through the Entries database's default view in view mode, and filter what you hold. Fetch the database for its view's link.
-- If Notion says the allowance is used up, read through the default view for the rest of the job, and tell the user once, in one line, that Notion's query limit was reached and resets within the hour. Pass on no offer or link from Notion's message.
+- To read many Entries, such as every Link for a Graveyard import, page through the Entries database's table view in view mode, and filter what you hold. Fetch the database for its views' links, and use the table view with no filter: the first view, unless the user moved it. The other views filter or group the Entries, so they can hide some.
+- If Notion says the allowance is used up, read through the table view for the rest of the job, and tell the user once, in one line, that Notion's query limit was reached and resets within the hour. Pass on no offer or link from Notion's message.
 
 ## Operations
 
@@ -56,7 +58,7 @@ Query the Entries database for a row whose Link field equals the canonical link 
 
 ### Query the Entries
 
-Query the Entries database with a filter on Status or on a date property. When a job wants the Inbox Entries and the shared saves, ask for both in one query: Status is Inbox, or Status is empty. To read one field of many Entries, page through the default view, as [Querying the Entries](#querying-the-entries) says.
+Query the Entries database with a filter on Status or on a date property. When a job wants the Inbox Entries and the shared saves, ask for both in one query: Status is Inbox, or Status is empty. To read one field of many Entries, page through the table view, as [Querying the Entries](#querying-the-entries) says.
 
 ### Search the Entries
 
@@ -68,7 +70,19 @@ Create a row in the Entries database, with the Library's property names. Create 
 
 ### Update an Entry
 
-Update the row's properties. Add long text at the end of the page body: "Captured again" lines as paragraphs, and the Transcript and On-screen text as sections under headings. Set the cover as the page cover's external link: the post script's `cover_url`. A page cover cannot be a local file, so with no `cover_url` the Entry has no cover.
+Update the row's properties. Add long text at the end of the page body: "Captured again" lines as paragraphs, and the Transcript and On-screen text as sections under headings.
+
+Set the cover only when the Fields table has a Cover row. To set it:
+
+1. Create a file upload with your Notion connector, named after the image file, such as `thumbnail.jpg`.
+2. Send the image with the post script at once, since the upload URL lasts only minutes. Run it as one command, and pass each header the upload gave as a `--header`, and add `--field <name>` when its form field is not `file`:
+
+   ```
+   python3 scripts/post.py upload "<image>" "<upload URL>" --header "<name>: <value>"
+   ```
+
+   Done when it prints `uploaded`. It sends only to Notion, and only an image that the post script made.
+3. Set the Cover property to the upload, as its only file, at once: Notion deletes an upload that no page holds within an hour.
 
 ### Add a Category
 
@@ -93,6 +107,34 @@ Leave the row as it is: Notion has no place to move it to. Each run skips it aga
 ### Remove a duplicate
 
 Move the Entry's page to the Notion trash. When you ask the user, and when you tell them it is done, call it moving to the trash. The connector trashes a page only on the user's say-so, and their yes is it.
+
+### Add the views
+
+Fetch the Entries database for its data source, its properties and its views. Done when Entries has the Cover property and the three views below, each once, after the table.
+
+1. **The Cover property.** If the Settings' Fields table has no Cover row, [write the Settings](#write-the-settings): add the row after Note, with "Cover" in the Settings language (in Italian "Copertina"). If Entries has no property with that name, add it as a Files & media property. Never use another property the user made.
+2. **The views.** Add each view below whose name, in the Settings language, the database does not have yet. Make each one a tab of the Entries database, by giving your Notion connector the database and its data source: never the Library page, which would add a second, linked copy of the database. In the view settings, write the Library's own property names and Status labels, each in double quotes, and keep the rest of each line as it is: Notion takes `CARD SIZE` only on a gallery and never beside a cover's `SIZE`.
+   - **Gallery** (in Italian "Galleria"): a gallery of covers, grouped by Category, newest first.
+
+     ```
+     COVER "<Cover>" SIZE medium ASPECT cover; SHOW "<Title>", "<Tags>", "<Next action>"; GROUP BY "<Category>"; SORT BY "<Captured>" DESC, "<Saved>" DESC; QUICK FILTER "<Tags>", "<Status>"
+     ```
+
+   - **To read** ("Da leggere"): a list of the Entries the Worker has not read yet, shared saves included.
+
+     ```
+     FILTER "<Status>" IN ("<Inbox>", "<Buried>") OR "<Status>" IS EMPTY; SORT BY "<Captured>" DESC, "<Saved>" DESC; SHOW "<Title>", "<Platform>", "<Captured>", "<Saved>"
+     ```
+
+   - **Board** ("Bacheca"): a board with one column per Status.
+
+     ```
+     GROUP BY "<Status>"; COVER "<Cover>" SIZE small ASPECT cover; SHOW "<Title>", "<Category>", "<Next action>"; SORT BY "<Captured>" DESC, "<Saved>" DESC
+     ```
+
+3. **The table.** Leave it as it is: agents read the Entries through it.
+
+A new view goes after the existing ones, so the table stays first (tested on 2026-11-16). The connector cannot move a view, and the user may drag the gallery's tab first: agents still find the table by its type.
 
 ### Link to an Entry
 

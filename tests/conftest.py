@@ -16,7 +16,8 @@ import pytest
 
 SCRIPT = Path(__file__).parent.parent / "plugin/skills/graveyard-killer/scripts/post.py"
 FAKE = Path(__file__).parent / "fakes/fake_tool.py"
-FAKE_NAMES = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2", "uv")
+FAKE_NAMES = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2", "uv",
+              "osascript", "notify-send", "powershell")
 
 
 def link_or_copy(source: str | Path, target: Path) -> None:
@@ -133,9 +134,15 @@ def post(tmp_path: Path, fake_launcher: Path | None) -> Iterator[Callable[..., R
         log.write_text("")
         temp = tmp_path / "temp"  # work folders land here, inside pytest's own cleaned-up folder
         temp.mkdir(exist_ok=True)
+        # Smart App Control can block the fakes' launchers too. Then post.py looks for the tool's
+        # uv environment, and this computer's real yt-dlp would read the link over the network.
+        # In an empty folder it finds none, so a blocked fake fails with a clear BlockedTool.
+        uv_tools = tmp_path / "uv-tools"
+        uv_tools.mkdir(exist_ok=True)
         full_env = {
             **os.environ,
             "TMPDIR": str(temp),
+            "UV_TOOL_DIR": str(uv_tools),
             **(env or {}),
             "PATH": os.pathsep.join([str(bin_dir), str(Path(sys.executable).parent)]),
             "GK_FAKE_SCENARIO": str(scenario_file),

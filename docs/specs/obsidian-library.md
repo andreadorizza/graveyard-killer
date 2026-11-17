@@ -1,8 +1,8 @@
-Built for 0.9.0. The spec the Obsidian Library was built from, kept as a record; the skill files and ADR 0007 describe current behaviour. Settled while building (2026-11-16):
+Built for 0.12.0. The spec the Obsidian Library was built from, kept as a record; the skill files and ADR 0010 describe current behaviour. Settled while building (2026-11-16):
 
 - **Phone saves.** Every share is appended to one "Share here" note. On Android that is one step and carries the post's caption (tested on a Pixel); a new note per share takes an extra step there. On an iPhone, a Share Sheet Location of the kind *Bookmarked note* appends to the same note (untested). The Worker moves each share's exact text to an "Already read" note.
 - **Sync.** Setup asks how the vault reaches the phone, and says that the Worker reads only what has synced.
-- **No phone chat.** Accepted: Recall, answering a Ping and chat Capture work only in the Code tab on the computer (ADR 0007). The Ping email still arrives.
+- **No phone chat.** Accepted: Recall, answering a Ping and chat Capture work only in the Code tab on the computer (ADR 0010). The Ping email still arrives.
 - **The pointer.** The Library folder's absolute path, a new row in library.md's table. It goes in `~/.claude/CLAUDE.md` only.
 - **Covers.** Copied from the post script's thumbnail into an Attachments folder, for every platform, and shown by the Base's cards view.
 - **Writes.** Through a new stdlib script, `scripts/vault.py`, not by the agent editing YAML.

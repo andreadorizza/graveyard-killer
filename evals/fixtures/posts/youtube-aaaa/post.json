@@ -1,0 +1,5 @@
+{
+  "link": "https://www.youtube.com/watch?v=aaaa",
+  "recorded": "post.py read, 2026-11-16: yt-dlp's own error for a truncated link, as it printed it.",
+  "error": "ERROR: [youtube:truncated_id] aaaa: Incomplete YouTube ID aaaa. URL https://www.youtube.com/watch?v=aaaa looks truncated."
+}
