@@ -139,6 +139,21 @@
         "It asks one question, not several",
         "No Entry is created before the user answers"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "Graveyard Killer, aggiungi la galleria alla mia Libreria",
+      "expected_output": "Seed: on Notion, the Entries database has only its table view, with no Cover property and no Cover row in the Settings' Fields, as in a Library made before 0.10.0. The agent adds the views and says where they are. On Google Drive it changes nothing.",
+      "files": [],
+      "expectations": [
+        "On Notion, the Settings' Fields table has a Cover row after Note, named in the Settings language, and Entries has a Files & media property with that name",
+        "On Notion, Entries has, after the table, a gallery that uses the Cover property as its cover and is grouped by Category, a to-read list and a board grouped by Status, named in the Settings language",
+        "The new views are tabs of Entries: the Library page holds no new linked database",
+        "The table view is still the first view, with no filter",
+        "No Entry is created or changed, and nothing else in the Settings changes",
+        "The reply says in one line, in the Settings language, where to find the views. On Google Drive it says that a Drive Library has no gallery, since Sheets shows no covers",
+        "Asking a second time adds no view and no property"
+      ]
     }
   ]
 }

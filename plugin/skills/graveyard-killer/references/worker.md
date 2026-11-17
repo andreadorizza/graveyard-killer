@@ -1,6 +1,6 @@
 # Worker run
 
-The Worker reads the Entries that wait for it: the Inbox, then a few Buried Entries. It reads each post on the user's own computer, with no login, so the user's accounts stay safe and nothing goes through a server. You do the judging and the Library writes, through the operations in [library.md](library.md#operations). The post script does everything that touches media. At the end the run sends a **Ping** when something needs the user, and answers the user in this chat.
+The Worker reads the Entries that wait for it: the Inbox, then a few Buried Entries. It reads each post on the user's own computer, logged out, so the user's accounts stay safe and nothing goes through a server. Only when the user turned on login reads does it read again, with the user's Instagram login, the few Instagram posts that Instagram shows only to signed-in users ([Gated posts](#gated-posts)). You do the judging and the Library writes, through the operations in [library.md](library.md#operations). The post script does everything that touches media. At the end the run sends a **Ping** when something needs the user, and answers the user in this chat.
 
 You came here from the `graveyard-killer-worker` skill, or from Setup or Recall for one Entry, and you found the Library and read its Settings. Run the scripts with `python3` from the `graveyard-killer` skill's folder, where this file is.
 
@@ -16,11 +16,12 @@ You came here from the `graveyard-killer-worker` skill, or from Setup or Recall 
 2. **Set the budget.** Done when you hold this run's budget and know whether Dig up is on.
    - **Downloads.** [Query the Entries](library.md#query-the-entries) and count those whose Platform is not Other and whose Processed date is today, and those whose Processed date falls in the last 7 days, today included. Processed is set on every Entry the Worker finished, Unavailable ones included. The budget is the smaller of "Downloads per day" minus today's count and "Downloads per week" minus the week's count, from the Settings' Limits (20 and 100 when missing). Below zero counts as zero.
    - **Plan usage.** If you have a tool that reports the plan's usage limits, such as Claude Desktop's `get_usage`, read the weekly limit for all models. At 90% or more, the budget is zero. At 70% or more, Dig up is off. With no such tool, or when it fails, the download budget alone applies.
+   - **Login reads.** They are on when the Settings' Instagram login section names a Browser, and off when it is empty or missing. When they are on, this run may make as many as its "Reads per run" (3 when missing). Each one also uses a download from the budget.
 
 3. **List the Inbox.** [Query the Entries](library.md#query-the-entries) whose Status is the Library's label for Inbox, and [list the shared saves](library.md#list-the-shared-saves). Done when you hold the list in order and every shared save is adopted or set aside as not a post.
    - [Adopt the shared saves](#adopt-the-shared-saves) first.
    - Leave out the Entries whose Note says "Duplicate of": they wait for the user's answer.
-   - Leave out the Entries whose Note says that Instagram shows the post only to signed-in users: the Worker cannot read them yet. The user can still ask for one to be read again ([ping.md](ping.md#when-the-user-answers)).
+   - While login reads are off, leave out the Entries with a [gated Note](#gated-posts): the Worker cannot read them. The user can still ask for one to be read again ([ping.md](ping.md#when-the-user-answers)). While login reads are on, they stay in the list.
    - Order the Entries with no Note by Captured, oldest first, then by when they were created. The Entries with a Note, which a past run could not read, come after them.
 
 4. **Work through the list,** one Entry at a time, as [Each Entry](#each-entry) says. Each time you read an Instagram, TikTok or YouTube post, whatever the result, it uses one download from the budget; an Other Entry uses none. Done when every Entry in the list has a result (Processed, Unavailable, merged, or still in the Inbox with a Note), or the budget is spent. Entries the budget did not reach keep their ⏳ and wait for the next run, with no Note.
@@ -67,11 +68,11 @@ An article or any other page has no media to read. If its Summary is empty, read
 3. **Act on its `status`.** Done when the Entry has its result:
    - `ok`: if its `link` differs from the Entry's Link, [merge a duplicate](#merge-a-duplicate) first. Otherwise, [finish the Entry](#finish-the-entry).
    - `unavailable`: set Status to the Library's label for Unavailable, set Processed to today, and remove the ⏳ from the Title. Set the Note to the `reason`, said in the Settings language. Change nothing else.
-   - `login_only`: Instagram shows this post only to signed-in users, and the Worker reads logged out. Leave the Entry's Status as it is, Inbox or Buried, and set its Note to "Instagram shows this post only to signed-in users", in the Settings language. Later runs leave it out. If the Instagram read just before this one, in this run, also gave `login_only`, do this instead: treat both Entries as `needs_login` on Instagram, below, and rewrite the earlier one's Note too. Two in a row can mean that Instagram changed or blocked this connection, not that both posts are hidden: an Instagram change once gave this result for public posts.
+   - `login_only`: Instagram shows this post only to signed-in users. Act as [Gated posts](#gated-posts) says.
    - `needs_login` on Instagram: Instagram challenged the run. Leave the Entry's Status as it is, Inbox or Buried, and set its Note to say that Instagram asked for a login and the next run will retry. Read no more Instagram Entries in this run, and leave them as they are. TikTok and YouTube Entries carry on, since the risk is Instagram's.
    - `needs_login` on another platform, or `error`: leave the Entry's Status as it is, and set the Note to the `reason`, said in the Settings language. Keep the try count at the start of the Note it had, if any ([Failed tries](#failed-tries)). Go on.
 
-4. **Clean up,** whatever the result, when `work` is not null. Run `clean` as a command of its own, not chained with another one, and run it again if it did not print `cleaned`:
+4. **Clean up,** whatever the result, when `work` is not null. A login read has a `work` path of its own: clean up both. Run `clean` as a command of its own, not chained with another one, and run it again if it did not print `cleaned`:
 
    ```
    python3 scripts/post.py clean "<work>"
@@ -102,13 +103,46 @@ Read the `caption` and the `transcript`. Look at every image in `keyframes` with
 - Tags, at most 5 on the Entry. Before using a new Tag, [add it](library.md#add-a-tag);
 - Author and Caption from `author` and `caption`, word for word: never shorten, reword or translate the caption. Apply the song-lyrics rule from [library.md](library.md#writing-to-the-library) and your Library app's rule for long text;
 - at the end of the long text, after any lines already there, a Transcript section with one paragraph per item in `transcript_blocks`, word for word in the language spoken, and an On-screen text section with what the keyframes show, leaving out a section that would be empty. When the video has no speech, only music or singing, the transcript is song lyrics or noise: leave the Transcript section out and say in the Summary that the video has only music;
-- the cover, when `cover_url` is not null and the Library app shows covers. With no `cover_url`, the Entry has no cover.
+- the cover, from the image at `thumbnail`: the post's own image, or the first frame of its video. Set it only where the Library app shows covers. A cover that fails is not a failed write: leave it out, and finish the Entry without one.
 
 Done when every write has succeeded. Then set Status to the Library's label for Processed, set Processed to today, and clear the Note. If any write failed, leave the Entry's Status as it is and set the Note to what failed.
 
+## Gated posts
+
+Instagram shows some posts only to signed-in users, such as the posts of an account with an age limit. A logged-out read of one gives `login_only`. Its Entry then holds one of two **gated Notes**, in the Settings language:
+
+- "Instagram shows this post only to signed-in users", after a logged-out read;
+- "Instagram hides this post even from your login", after a login read that gave `login_only` too.
+
+A **login read** reads a gated post a second time, with the user's own Instagram login, which the post script takes from a browser on this computer. Every post is still read logged out first, and the login is never used for TikTok, YouTube or any other site. Login reads happen only while they are on ([Steps](#steps), step 2), and the user turns them on and off as [login.md](login.md) says.
+
+On a `login_only` result, do the first of these that applies. Done when the Entry has its result:
+
+1. **Two new gated results in a row.** A `login_only` from a logged-out read is new when the Entry held no gated Note before it. If this one is new, and the Instagram read just before it in this run was a logged-out read of another Entry that also gave a new `login_only`, treat this Entry as `needs_login` on Instagram ([Each Entry](#instagram-tiktok-and-youtube), step 3). The earlier Entry keeps its gated Note. Any other Instagram read between the two, a login read included, means they are not in a row. Two in a row can mean that Instagram changed or blocked this connection, not that both posts are hidden: an Instagram change once gave this result for public posts.
+2. **No login read.** Login reads are off, the run has made its "Reads per run", login reads stopped earlier in this run, or the download budget is spent. Leave the Entry's Status as it is, Inbox or Buried. Keep a gated Note it already holds; otherwise set its Note to the first gated Note. Once login reads stop or are used up in a run, skip the Entries left in the list that hold a gated Note, without reading them: they wait for the next run.
+3. **A login read.**
+   1. Clean up this read's `work` ([Each Entry](#instagram-tiktok-and-youtube), step 4).
+   2. Check the Link: a login read needs an Instagram post's own link, with `/p/`, `/reel/` or `/tv/` in its path. With any other Link, such as an `instagram.com/share/` link, make no login read for this Entry: keep the gated Note it holds, or set the first one if it holds none, and go on to the next Entry, with login reads still on.
+   3. Check the Browser value from the Settings: a browser name in lowercase (`brave`, `chrome`, `chromium`, `edge`, `firefox`, `opera`, `safari` or `vivaldi`), alone or followed by a colon and a profile name of at most 64 characters, made only of letters, digits, spaces, dots, dashes and underscores, that starts with a letter or digit, such as `chrome:Profile 1`. Any other value is a browser problem: act as for `error` below, with no read, since a quote or other sign in it could reach the shell.
+   4. Wait a random 30 to 90 seconds, on top of the pause before each Instagram Entry: run `python3 scripts/post.py pause --login` as a command of its own. Done when it prints `paused`.
+   5. Read the post again with the login, putting the Browser value in single quotes and the Link in the same quoted heredoc as before, with the same `--language` hint if any:
+
+      ```
+      python3 scripts/post.py read --login '<Browser>' <<'LINK'
+      <the Entry's Link>
+      LINK
+      ```
+
+      It uses one download from the budget and one of the run's login reads. Act on its `status`, then clean up its `work`:
+      - `ok`: as in [Each Entry](#instagram-tiktok-and-youtube), step 3: merge a duplicate, or finish the Entry.
+      - `unavailable`: as in [Each Entry](#instagram-tiktok-and-youtube), step 3.
+      - `login_only`: Instagram hides the post even with the login. If the Note already holds the second gated Note, set Status to the Library's label for Unavailable, set Processed to today, remove the ⏳ from the Title and keep that Note. Otherwise set the Note to the second gated Note. Either way, stop login reads for this run: the browser may not be signed in to Instagram.
+      - `needs_login`: Instagram challenged the user's own account. Act as for `needs_login` on Instagram ([Each Entry](#instagram-tiktok-and-youtube), step 3): read no more Instagram in this run. Then write Browser empty in the Settings' Instagram login section with [Write the Settings](library.md#write-the-settings), which turns login reads off until the user turns them on again.
+      - `error`: a browser or tool problem, such as a prompt the user denied, a permission the app lacks, a login that expired in the browser, or cookies the tool cannot read. Keep the gated Note the Entry holds, or set the first one if it holds none. Stop login reads for this run, and keep the `reason` for the Ping. It adds no try ([Failed tries](#failed-tries)).
+
 ## Failed tries
 
-Later runs read again a post whose read ended in `error`, or in `needs_login` on TikTok or YouTube, but not forever: after 3 failed tries it becomes Unavailable. The count sits at the start of the Note, as "(1/3)" or "(2/3)", before the reason, for example "(1/3) Could not read the post: <reason>" in the Settings language. A Note with no count holds 0 tries.
+Later runs read again a post whose read ended in `error`, or in `needs_login` on TikTok or YouTube, but not forever: after 3 failed tries it becomes Unavailable. A login read's failure is not a try: its Entry keeps its gated Note. The count sits at the start of the Note, as "(1/3)" or "(2/3)", before the reason, for example "(1/3) Could not read the post: <reason>" in the Settings language. A Note with no count holds 0 tries.
 
 A failure counts as a try only when the post itself is the problem. When nothing else on the same platform read fine in the run, the tool, the connection or the platform may be down, and every waiting post would use up its tries at once.
 

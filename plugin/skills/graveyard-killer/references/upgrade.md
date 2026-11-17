@@ -1,6 +1,6 @@
 # Bring a Library up to date
 
-A Library outlives the version of Graveyard Killer that made it. The Settings' **Version** names the newest step below that the Library has had. A Library with no Version was made before 0.8.0. The newest heading under [Steps](#steps) is this skill's Library version.
+A Library outlives the version of Graveyard Killer that made it. The Settings' **Version** names the newest step below that the Library has had. A Library with no Version was made before 0.8.0. The newest heading under [Steps](#steps), the last one, is this skill's Library version. Compare versions number by number, not as text: 0.10.0 is newer than 0.9.0.
 
 You came here from SKILL.md's step 3 ([read the Settings](../SKILL.md#3-read-the-settings)).
 
@@ -29,9 +29,17 @@ Do every step whose version is newer than the Library's Version, or every step w
 
 - The Version section arrives with [Every upgrade](#every-upgrade).
 
+### 0.9.0
+
+- The Instagram login section arrives with [Every upgrade](#every-upgrade), after Limits, with "Browser" empty and "Reads per run" at 3: login reads stay off until the user turns them on ([login.md](login.md)). Ask nothing of the user for it.
+
+### 0.10.0
+
+- **Views and covers.** [Add the views](library.md#add-the-views). From now on the Worker gives each Entry it finishes a cover, where the Library app shows one. Entries finished before keep none.
+
 ## Every upgrade
 
 Last, whatever the Library's Version:
 
-1. **Missing sections and rows.** Add each section of [library.md's Settings](library.md#the-settings) that the Settings lack, and each row of its Limits, Pings and Graveyard tables, in library.md's order, with library.md's defaults: the Limits at 20 a day and 100 a week, every other new setting empty. Leave the values already there, and leave any row library.md does not name.
+1. **Missing sections and rows.** Add each section of [library.md's Settings](library.md#the-settings) that the Settings lack, and each row of its Limits, Instagram login, Pings and Graveyard tables, in library.md's order, with library.md's defaults: the Limits at 20 a day and 100 a week, "Reads per run" at 3, every other new setting empty. Leave the values already there, and leave any row library.md does not name.
 2. **Version.** Set it to the newest heading under [Steps](#steps).

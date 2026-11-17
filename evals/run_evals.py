@@ -51,8 +51,10 @@ APPS: dict[str, dict[str, Any]] = {
         "servers": ["claude.ai Google Drive", "claude.ai Google Sheets"],
     },
 }
-# A session whose app connectors are still pending, or missing, when it starts fails to reach the Library
-# (seen on 2026-11-13). The runner stops such a session at once and starts it again, this many times in all.
+# A session whose app connectors are missing when it starts fails to reach the Library (seen on 2026-11-13).
+# The runner stops such a session at once and starts it again, this many times in all. Since Claude Code
+# 2.1.322 a claude.ai connector is still pending when the session starts and connects seconds later
+# (2026-11-16), so pending passes.
 ATTEMPTS = 3
 NO_MEMORY = {("capture", 12)}
 SETTINGS = json.dumps(
@@ -103,9 +105,9 @@ def command(app: str, prompt: str) -> list[str]:
 
 
 def connectors_ready(event: dict[str, Any], app: str) -> bool:
-    """Whether a session's init event shows every connector of the app as connected."""
+    """Whether a session's init event shows every connector of the app as connected or connecting."""
     status = {server.get("name"): server.get("status") for server in event.get("mcp_servers", [])}
-    return all(status.get(name) == "connected" for name in APPS[app]["servers"])
+    return all(status.get(name) in ("connected", "pending") for name in APPS[app]["servers"])
 
 
 def attempt(cmd: list[str], cwd: pathlib.Path, out: IO[str], app: str) -> str:

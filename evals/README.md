@@ -117,9 +117,12 @@ The Worker downloads and transcribes, so the tools from `post.py check` must be 
 - Eval 8 (an article) stands alone. Eval 9 checks after any run.
 - Eval 11 needs a shared save made through the app's share route, of a reel that is not in the Library yet. Eval 12 needs "Ping by" set to `none` and an empty Preferences table in the test Library's Settings.
 - Eval 14 runs right after eval 13. Evals 15 and 16 seed a Note with a try count by hand; eval 16 needs no other YouTube Entry waiting.
+- Evals 13, 14 and 19 test gated posts. No eval uses a real login: keep the test Library's Instagram login Browser empty, except for eval 19's seed, which is not a browser. Login reads themselves are checked by hand on the maintainer's computer, with each browser that [login.md](../plugin/skills/graveyard-killer/references/login.md#browsers) offers, before each release that changes them.
 
 ## Google Drive alone (`drive.json`)
 
 These run only against the Drive test Library. Each `expected_output` gives its seed: write rows with the Sheets connector's `update_spreadsheet` (`appendCells`, text as `stringValue`), and put shared files in "Share here" with the Drive connector.
 
 The post script itself is tested in `tests/test_post.py` with fake tools and no network, and in `tests/test_post_live.py` against the real tools (`uv run pytest -m live`).
+
+On Windows with Smart App Control on, `uv run pytest` cannot start: Smart App Control blocks the unsigned `pytest.exe` in `.venv`. Run `uv run python -m pytest` instead. Smart App Control can also block the fake tools' launchers, and then the tests that use them fail with "Windows Smart App Control blocked".

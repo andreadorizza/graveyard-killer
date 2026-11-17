@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
+import json
 import platform
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -672,20 +675,6 @@ def test_many_scenes_give_at_most_8_distinct_keyframes(post: Callable[..., Run],
     assert len({Path(f).read_bytes() for f in frames}) == 8
 
 
-def test_youtube_gets_a_stable_cover_url(post: Callable[..., Run], media: dict[str, Path]) -> None:
-    # Notion's connector takes only an external URL as a cover, and YouTube's image host is stable.
-    run = post("read", VIDEO, scenario=youtube(media))
-
-    assert run.output["cover_url"] == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
-
-
-def test_instagram_and_tiktok_get_no_cover_url(post: Callable[..., Run], media: dict[str, Path]) -> None:
-    # Their image links are signed and expire within days.
-    run = post("read", REEL, scenario=reel(media))
-
-    assert run.output["cover_url"] is None
-
-
 def test_a_long_transcript_comes_in_blocks_that_fit_notion(
     post: Callable[..., Run], media: dict[str, Path]
 ) -> None:
@@ -720,6 +709,356 @@ def test_pause_waits_a_random_6_to_12_seconds(post: Callable[..., Run]) -> None:
     assert 6 <= run.output["paused"] <= 12
     assert time.monotonic() - started < 5
     assert run.calls == []
+
+
+def test_pause_before_a_login_read_waits_a_random_30_to_90_seconds(post: Callable[..., Run]) -> None:
+    started = time.monotonic()
+    run = post("pause", "--login", env={"GK_PAUSE_SCALE": "0.01"})
+
+    assert run.exit_code == 0
+    assert 30 <= run.output["paused"] <= 90
+    assert time.monotonic() - started < 5
+    assert run.calls == []
+
+
+# Login reads (#13): a second read of a gated Instagram post with the cookies of a browser on this
+# computer. No test reads a real browser's cookies: the fake tools only log what they were given.
+
+
+def cookies_from_browser(argv: list[str]) -> str:
+    return argv[argv.index("--cookies-from-browser") + 1]
+
+
+def test_a_login_read_gives_both_tools_the_browser_and_never_a_cookie_file(
+    post: Callable[..., Run], media: dict[str, Path]
+) -> None:
+    photo_error = {"exit": 1, "stderr": "ERROR: [Instagram] Rk3elTest01: There is no video in this post"}
+    scenario = {"yt-dlp": [photo_error, {"json": {"id": "Rk3elTest01"}}], "gallery-dl": [slides(media)]}
+
+    run = post("read", REEL, "--login", "firefox", scenario=scenario)
+
+    assert run.output["status"] == "ok"
+    for yt_dlp in run.called("yt-dlp"):
+        assert cookies_from_browser(yt_dlp) == "firefox"
+        assert "--no-cookies" not in yt_dlp and "--cookies" not in yt_dlp
+        assert "--ignore-config" in yt_dlp
+        # It loads every cookie of the browser, so it may not follow the post to another site.
+        assert yt_dlp[yt_dlp.index("--use-extractors") + 1] == "Instagram"
+        assert "--no-warnings" not in yt_dlp  # its cookie warnings tell a browser problem from a gated post
+        assert yt_dlp[-2:] == ["--", REEL]
+    gallery_dl = run.called("gallery-dl")[0]
+    # Only Instagram's cookies, from every Firefox container, as yt-dlp reads them by default.
+    assert cookies_from_browser(gallery_dl) == "firefox/.instagram.com::all"
+    assert "--cookies" not in gallery_dl
+    assert "--config-ignore" in gallery_dl
+
+
+@pytest.mark.parametrize(
+    ("login", "yt_dlp_value", "gallery_dl_value"),
+    [
+        ("chrome:Profile 1", "chrome:Profile 1", "chrome/.instagram.com:Profile 1"),
+        ("firefox:a1b2c3d4.default-release", "firefox:a1b2c3d4.default-release",
+         "firefox/.instagram.com:a1b2c3d4.default-release::all"),
+        ("Edge", "edge", "edge/.instagram.com"),
+    ],
+)
+def test_a_profile_reaches_both_tools_after_the_domain_for_gallery_dl(
+    post: Callable[..., Run], media: dict[str, Path], login: str, yt_dlp_value: str, gallery_dl_value: str
+) -> None:
+    photo_error = {"exit": 1, "stderr": "ERROR: [Instagram] Rk3elTest01: There is no video in this post"}
+    scenario = {"yt-dlp": [photo_error, {"json": {"id": "Rk3elTest01"}}], "gallery-dl": [slides(media)]}
+
+    run = post("read", REEL, "--login", login, scenario=scenario)
+
+    assert [cookies_from_browser(c) for c in run.called("yt-dlp")] == [yt_dlp_value, yt_dlp_value]
+    assert cookies_from_browser(run.called("gallery-dl")[0]) == gallery_dl_value
+
+
+def test_a_login_read_of_a_gated_reel_reads_it(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    run = post("read", REEL, "--login", "firefox", scenario=reel(media))
+
+    assert run.output["status"] == "ok"
+    assert run.output["author"] == "some.creator"
+
+
+def test_a_login_read_reads_the_posts_canonical_link(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    run = post("read", "--login", "firefox", scenario=reel(media),
+               stdin="https://www.instagram.com/reel/Rk3elTest01/?igsh=abc123")
+
+    assert run.output["status"] == "ok"
+    assert run.called("yt-dlp")[0][-2:] == ["--", REEL]
+
+
+@pytest.mark.parametrize(
+    "link",
+    [VIDEO, TIKTOK, "https://example.com/article",
+     # Instagram links that are not a post's own: a share link and the link shim redirect elsewhere.
+     "https://www.instagram.com/share/reel/BAbCdEf123/",
+     "https://l.instagram.com/?u=https%3A%2F%2Fexample.com%2F",
+     "https://www.instagram.com/some.creator/"],
+)
+def test_a_login_read_of_anything_but_an_instagram_post_is_refused_before_any_tool_runs(
+    post: Callable[..., Run], link: str
+) -> None:
+    run = post("read", "--login", "firefox", scenario={"yt-dlp": [{}], "gallery-dl": [{}]}, stdin=link)
+
+    assert run.output["status"] == "error"
+    assert "Instagram" in run.output["reason"]
+    assert run.output["work"] is None
+    assert run.calls == []
+
+
+@pytest.mark.parametrize(
+    "browser",
+    ["firefox --exec x", "firefox;rm -rf ~", "../x", "firefox:../x", "firefox:..", "firefox:", "",
+     "firefox+gnomekeyring", "firefox::Personal", "firefox:Profile\n1", "whale", "chrome:" + "a" * 65,
+     "chrome:/Users/me/x"],
+)
+def test_a_browser_value_that_is_not_a_known_browser_and_plain_profile_is_refused(
+    post: Callable[..., Run], browser: str
+) -> None:
+    run = post("read", REEL, "--login", browser, scenario={"yt-dlp": [{}], "gallery-dl": [{}]})
+
+    assert run.output["status"] == "error"
+    assert "--login" in run.output["reason"]
+    assert run.calls == []
+
+
+def test_a_browser_yt_dlp_cannot_read_is_an_error_with_its_reason(post: Callable[..., Run]) -> None:
+    error = "ERROR: could not find firefox cookies database in /Users/someone/Library/Application Support/Firefox"
+    run = post("read", REEL, "--login", "firefox", scenario={"yt-dlp": [{"exit": 1, "stderr": error}]})
+
+    assert run.output["status"] == "error"
+    assert "cookies database" in run.output["reason"]
+
+
+def test_cookies_gallery_dl_cannot_load_are_an_error_not_a_challenge(post: Callable[..., Run]) -> None:
+    # gallery-dl only warns when it cannot load the cookies, then meets the login page logged out.
+    stderr = ("[instagram][warning] cookies: Unable to find Firefox cookies database\n"
+              "[instagram][error] HTTP redirect to login page (https://www.instagram.com/accounts/login/)")
+    scenario = {"yt-dlp": [NO_VIDEO, {"json": {"id": "DAbc123xyz"}}], "gallery-dl": [{"exit": 1, "stderr": stderr}]}
+
+    run = post("read", CAROUSEL, "--login", "firefox", scenario=scenario)
+
+    assert run.output["status"] == "error"
+    assert "Unable to find Firefox cookies database" in run.output["reason"]
+
+
+@pytest.mark.parametrize(
+    "error",
+    ["ERROR: [Instagram] Rk3elTest01: checkpoint_required",
+     "ERROR: [Instagram] Rk3elTest01: Requested content is not available, rate-limit reached or login required."],
+)
+def test_a_challenge_during_a_login_read_needs_login(post: Callable[..., Run], error: str) -> None:
+    run = post("read", REEL, "--login", "firefox", scenario={"yt-dlp": [{"exit": 1, "stderr": error}], "uv": [{}]})
+
+    assert run.output["status"] == "needs_login"
+    assert len(run.called("yt-dlp")) == 1
+
+
+def test_a_post_hidden_even_with_the_login_is_still_login_only(post: Callable[..., Run]) -> None:
+    # gallery-dl, asked with the same cookies, finds no media either.
+    scenario = {"yt-dlp": [{"exit": 1, "stderr": GATED}], "gallery-dl": [{"images": []}]}
+    run = post("read", REEL, "--login", "firefox", scenario=scenario)
+
+    assert run.output["status"] == "login_only"
+    assert "empty media response" in run.output["reason"]
+    assert len(run.called("gallery-dl")) == 1
+
+
+def test_a_gated_reel_that_yt_dlp_cannot_read_with_the_login_is_read_by_gallery_dl(
+    post: Callable[..., Run], media: dict[str, Path]
+) -> None:
+    # A signed-in Chrome session, 2026-11-16: yt-dlp still got an empty media response for an
+    # age-limited reel the account sees in the browser, and gallery-dl read it with the same cookies.
+    gallery = {"images": [str(media["scenes"])],
+               "metadata": {"username": "some.creator", "description": "A reel for adults only"}}
+    scenario = {**reel(media), "yt-dlp": [{"exit": 1, "stderr": GATED}], "gallery-dl": [gallery]}
+
+    run = post("read", REEL, "--login", "chrome", scenario=scenario)
+
+    assert run.output["status"] == "ok"
+    assert run.output["kind"] == "video"
+    assert run.output["link"] == REEL
+    assert run.output["author"] == "some.creator"
+    assert run.output["caption"] == "A reel for adults only"
+    assert run.output["transcript"] == "Three ways to cook chickpeas."
+    assert run.output["keyframes"]
+    assert Path(run.output["thumbnail"]).exists()
+    gallery_dl = run.called("gallery-dl")[0]
+    assert cookies_from_browser(gallery_dl) == "chrome/.instagram.com"
+    # The merged video file: for a DASH video gallery-dl would call yt-dlp's module, which its install lacks.
+    assert "extractor.instagram.videos=merged" in gallery_dl
+    assert gallery_dl[-2:] == ["--", REEL]
+
+
+def test_a_gated_photo_post_that_yt_dlp_cannot_read_with_the_login_is_read_by_gallery_dl(
+    post: Callable[..., Run], media: dict[str, Path]
+) -> None:
+    scenario = {"yt-dlp": [{"exit": 1, "stderr": GATED}], "gallery-dl": [slides(media)]}
+
+    run = post("read", REEL, "--login", "firefox", scenario=scenario)
+
+    assert run.output["status"] == "ok"
+    assert run.output["kind"] == "photos"
+    assert run.output["author"] == "some.creator"
+    assert len(run.output["keyframes"]) == 3
+
+
+def test_gallery_dl_finding_nothing_after_its_cookie_warning_is_an_error(post: Callable[..., Run]) -> None:
+    warning = "[instagram][warning] cookies: Unable to find Chrome cookies database at '/nowhere'"
+    scenario = {"yt-dlp": [{"exit": 1, "stderr": GATED}], "gallery-dl": [{"images": [], "stderr": warning}]}
+
+    run = post("read", REEL, "--login", "chrome", scenario=scenario)
+
+    assert run.output["status"] == "error"
+    assert "cookies" in run.output["reason"]
+
+
+def test_a_login_page_from_gallery_dl_on_a_login_read_needs_login(post: Callable[..., Run]) -> None:
+    login_page = {"exit": 1, "stderr": "[instagram][error] HTTP redirect to login page "
+                                       "(https://www.instagram.com/accounts/login/)"}
+    scenario = {"yt-dlp": [{"exit": 1, "stderr": GATED}], "gallery-dl": [login_page]}
+
+    run = post("read", REEL, "--login", "firefox", scenario=scenario)
+
+    assert run.output["status"] == "needs_login"
+
+
+def test_a_403_on_a_login_read_is_an_error_and_not_retried(post: Callable[..., Run]) -> None:
+    # A retry would use the account a second time, and the 403 may be Instagram refusing it.
+    forbidden = "ERROR: [Instagram] Rk3elTest01: Unable to download webpage: HTTP Error 403: Forbidden"
+    run = post("read", REEL, "--login", "firefox", scenario={"yt-dlp": [{"exit": 1, "stderr": forbidden}], "uv": [{}]})
+
+    assert run.output["status"] == "error"
+    assert len(run.called("yt-dlp")) == 1
+    assert run.called("uv") == []
+
+
+@pytest.mark.parametrize(
+    "warning",
+    ["WARNING: find-generic-password failed",  # a Keychain prompt denied, on macOS
+     "WARNING: cannot decrypt v10 cookies: no key found",
+     "WARNING: [Instagram] The provided Instagram account cookies are no longer valid"],
+)
+def test_a_gated_result_after_a_cookie_warning_is_a_browser_problem(post: Callable[..., Run], warning: str) -> None:
+    # yt-dlp goes on logged out when it cannot use the cookies: the post only looks hidden from the login.
+    run = post("read", REEL, "--login", "chrome", scenario={"yt-dlp": [{"exit": 1, "stderr": f"{warning}\n{GATED}"}]})
+
+    assert run.output["status"] == "error"
+    assert run.output["reason"] == warning
+
+
+def test_a_logged_out_read_ignores_the_tools_warnings(post: Callable[..., Run]) -> None:
+    stderr = f"WARNING: cannot decrypt v10 cookies: no key found\n{GATED}"
+    run = post("read", REEL, scenario={"yt-dlp": [{"exit": 1, "stderr": stderr}]})
+
+    assert run.output["status"] == "login_only"
+    assert "--no-warnings" in run.called("yt-dlp")[0]
+
+
+def test_the_cookie_copy_stays_in_the_work_folder_on_a_login_read(
+    post: Callable[..., Run], media: dict[str, Path]
+) -> None:
+    # The tools delete their copy of the cookie database, but not when post.py stops them at their
+    # time limit. In the work folder, clean deletes it then too.
+    photo_error = {"exit": 1, "stderr": "ERROR: [Instagram] Rk3elTest01: There is no video in this post"}
+    scenario = {"yt-dlp": [photo_error, {"json": {"id": "Rk3elTest01"}}], "gallery-dl": [slides(media)]}
+
+    run = post("read", REEL, "--login", "firefox", scenario=scenario)
+
+    work = Path(run.output["work"])
+    for call in run.calls:
+        assert Path(call["tmpdir"]).parent == work, call
+
+
+def test_a_logged_out_read_keeps_the_usual_temporary_folder(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    run = post("read", REEL, scenario=reel(media))
+
+    work = Path(run.output["work"])
+    assert all(work not in Path(call["tmpdir"]).parents for call in run.calls)
+
+
+UPLOAD_URL = "https://api.notion.com/v1/mcp/file_uploads/41af4b20-8c40-818f-8d78-00b2a2c1c469/send"
+
+
+def post_module() -> Any:
+    """The post script as a module, to stand in for the network in-process."""
+    scripts = str(Path(__file__).parent.parent / "plugin/skills/graveyard-killer/scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    return importlib.import_module("post")
+
+
+class FakeResponse:
+    def __init__(self, body: dict[str, Any]) -> None:
+        self.body = json.dumps(body).encode()
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.body
+
+
+def test_upload_sends_the_thumbnail_to_notion_with_the_connector_headers(
+    post: Callable[..., Run], media: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    thumb = Path(post("read", REEL, scenario=reel(media)).output["thumbnail"])
+    module = post_module()
+    sent: list[Any] = []
+
+    def fake_urlopen(request: Any, timeout: float) -> FakeResponse:
+        sent.append(request)
+        return FakeResponse({"file_upload_id": "abc", "status": "uploaded"})
+
+    monkeypatch.setattr(module, "urlopen", fake_urlopen)
+
+    result = module.upload(thumb, UPLOAD_URL, ["authorization: Bearer t0ken"])
+
+    assert result == {"uploaded": "abc"}
+    request = sent[0]
+    assert request.full_url == UPLOAD_URL
+    assert request.get_method() == "POST"
+    assert request.get_header("Authorization") == "Bearer t0ken"
+    assert request.get_header("Content-type").startswith("multipart/form-data; boundary=")
+    assert b'name="file"; filename="thumbnail.jpg"' in request.data
+    assert thumb.read_bytes() in request.data
+
+
+def test_upload_reports_what_notion_refused(
+    post: Callable[..., Run], media: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    thumb = Path(post("read", REEL, scenario=reel(media)).output["thumbnail"])
+    module = post_module()
+    monkeypatch.setattr(module, "urlopen", lambda request, timeout: FakeResponse({"status": "expired"}))
+
+    result = module.upload(thumb, UPLOAD_URL, ["authorization: Bearer t0ken"])
+
+    assert "expired" in result["error"]
+
+
+def test_upload_sends_nothing_outside_notion(post: Callable[..., Run], media: dict[str, Path]) -> None:
+    thumb = post("read", REEL, scenario=reel(media)).output["thumbnail"]
+
+    for url in ("https://example.com/send", "http://api.notion.com/v1/send", "https://api.notion.com.evil.io/send"):
+        run = post("upload", thumb, url, "--header", "authorization: Bearer t0ken")
+
+        assert run.exit_code != 0
+        assert "not a Notion upload URL" in run.output["error"]
+
+
+def test_upload_sends_only_an_image_that_read_made(post: Callable[..., Run], tmp_path: Path) -> None:
+    private = tmp_path / "passport.jpg"
+    private.write_bytes(b"\xff\xd8\xff")
+
+    run = post("upload", str(private), UPLOAD_URL, "--header", "authorization: Bearer t0ken")
+
+    assert run.exit_code != 0
+    assert "not an image that read made" in run.output["error"]
 
 
 @pytest.mark.parametrize("link", ["https://en.wikipedia.org/wiki/Pizzoccheri", "https://evil.test/?d=secret",
