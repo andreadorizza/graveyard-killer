@@ -30,12 +30,12 @@
     {
       "id": 3,
       "prompt": "run the Graveyard Killer worker",
-      "expected_output": "Seed: the YouTube Entry Capture already previewed. The Worker keeps its Title and adds the description and a transcript.",
+      "expected_output": "Seed: the YouTube Entry Capture already previewed. The Worker keeps its Title and adds the description. The video is a song with only music and singing, so it gets no Transcript section (worker.md).",
       "files": [],
       "expectations": [
         "The YouTube Entry keeps the Title Capture wrote, without its ⏳",
         "Its Caption holds the video's description",
-        "Its long text has a Transcript section",
+        "Its long text has no Transcript section, since the video has only music and singing, and its Summary says the video has only music",
         "Its Status is the Library's label for Processed",
         "On Notion, its Cover property holds one image, the video's thumbnail. Google Drive shows no covers, so nothing is written for one"
       ]

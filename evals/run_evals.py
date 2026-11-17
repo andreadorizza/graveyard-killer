@@ -1,9 +1,9 @@
 """Run the Graveyard Killer evals headless, one fresh agent session each.
 
 Usage:
-    python3 evals/run_evals.py [--agent claude|opencode] [--model <provider/model>] <app> <capture|worker|drive> <id> [<id> ...]
-    python3 evals/run_evals.py [--agent ...] [--model ...] <app> resume <run> "<reply>"
-    python3 evals/run_evals.py [--agent ...] [--model ...] <app> prompt <run> "<prompt>"
+    python3 evals/run_evals.py [--agent claude|opencode] [--model <provider/model>] [--fake-posts|--live-posts] <app> <capture|worker|drive> <id> [<id> ...]
+    python3 evals/run_evals.py [--agent ...] [--model ...] [--fake-posts|--live-posts] <app> resume <run> "<reply>"
+    python3 evals/run_evals.py [--agent ...] [--model ...] [--fake-posts|--live-posts] <app> prompt <run> "<prompt>"
 
 <app> is `notion` or `google-drive`. `resume` answers a finished run in its own
 session. `prompt` runs any message against the test Library, for example to seed it.
@@ -13,15 +13,23 @@ which needs `--model`, such as `opencode/glm-5.3-flash-free`, or `codex` (`codex
 only), whose `--model` defaults to the scheduled task's, gpt-6-luna. `--opencode-bin`, or
 OPENCODE_BIN, names another OpenCode command; `--codex-bin`, or CODEX_BIN, another Codex.
 
+Posts are fake by default: the run puts stand-ins for yt-dlp, gallery-dl and the speech engines
+first on PATH, and they answer from the recorded posts in evals/fixtures/posts, so nothing is
+downloaded. The evals in LIVE_POSTS, which test the platforms themselves, read real posts, as does
+any run given --live-posts; --fake-posts fakes them too. A resumed run keeps the posts it started with.
+
+
 Each run writes <temp folder>/gk-evals/<app>/<run>/, or gk-evals/<agent>/<model>/<app>/<run>/:
 out.jsonl (the session's stream), result.txt (its final message), session.txt,
-expectations.md (what to grade) and, for OpenCode and Codex, stats.json (time, steps, tokens).
+expectations.md (what to grade), posts.txt (fake or live), fakes/calls.jsonl (each fake tool's call)
+and, for OpenCode and Codex, stats.json (time, steps, tokens).
 evals/local.json, which is not committed, holds each app's test Library link and
 the placeholders' values; see evals/README.md.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import pathlib
@@ -32,6 +40,7 @@ import sys
 import tempfile
 import threading
 import time
+from collections.abc import Iterator
 from typing import IO, Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "plugin/skills/graveyard-killer/scripts"))
@@ -69,6 +78,14 @@ ALLOWED = ["Skill", "ToolSearch", "Read", "Glob", "Grep", "WebFetch", "Bash(slee
 # it out of the context, but an agent that finds no pointer will search for one, so it must not read there.
 DISALLOWED = ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar", "PushNotification", "Write", "Edit",
               f"Read(/{HOME}/.claude/**)"]  # A Read rule covers Grep and Glob too.
+
+# Fake posts: stand-ins for the tools that download and transcribe, answering from recorded posts.
+FAKE_TOOLS = ("yt-dlp", "gallery-dl", "parakeet-mlx", "mlx_whisper", "whisper-ctranslate2")
+FAKE_SOURCE = HERE / "fakes" / "post_tools.py"
+FIXTURES = HERE / "fixtures" / "posts"
+# Evals that test the platforms themselves, so they read real posts: TikTok's short links (2, 4), how
+# YouTube reports a missing video (5) and Instagram's posts for signed-in users only (13, 14, 19).
+LIVE_POSTS = {("worker", 2), ("worker", 4), ("worker", 5), ("worker", 13), ("worker", 14), ("worker", 19)}
 
 # OpenCode: the free route is Notion only (ADR-0007).
 OPENCODE_APPS = {"notion"}
@@ -525,25 +542,104 @@ def codex_run(folder: pathlib.Path, cmd: list[str], model: str, resume: bool = F
           f"{result}\n", flush=True)
 
 
+# --- Fake posts ----------------------------------------------------------------------------------
+
+def install_fakes(folder: pathlib.Path) -> pathlib.Path:
+    """<folder>/fakes/bin, holding one stand-in per tool and the fakes.json they read. Their calls go
+    to <folder>/fakes/calls.jsonl, which a resumed run adds to."""
+    fakes = folder / "fakes"
+    bin_dir = fakes / "bin"
+    shutil.rmtree(bin_dir, ignore_errors=True)
+    bin_dir.mkdir(parents=True)
+    # The runner's own Python runs the stand-ins, whatever python3 comes first on the session's PATH.
+    python = sys.executable if not re.search(r"\s", sys.executable) else "/usr/bin/env python3"
+    body = FAKE_SOURCE.read_text(encoding="utf-8").split("\n", 1)[1]
+    for name in FAKE_TOOLS:
+        tool = bin_dir / name
+        tool.write_text(f"#!{python}\n{body}", encoding="utf-8")
+        tool.chmod(0o755)
+    config = {"fixtures": str(FIXTURES), "scripts": str(SCRIPTS), "log": str(fakes / "calls.jsonl")}
+    (bin_dir / "fakes.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return bin_dir
+
+
+def fake_calls(folder: pathlib.Path) -> list[dict[str, Any]]:
+    log = folder / "fakes" / "calls.jsonl"
+    if not log.exists():
+        return []
+    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+@contextlib.contextmanager
+def posts(folder: pathlib.Path, live: bool) -> Iterator[None]:
+    """Run one session with real posts, or with the stand-ins first on PATH.
+
+    PATH changes in the runner's own environment, so every agent's session gets it, and so does
+    what the session's setup records from it, as `schedule.py` records PATH for a scheduled run.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "posts.txt").write_text("live\n" if live else "fake\n", encoding="utf-8")
+    if live:
+        yield
+        return
+    before = len(fake_calls(folder))
+    path = os.environ.get("PATH", "")
+    os.environ["PATH"] = f"{install_fakes(folder)}{os.pathsep}{path}"
+    try:
+        yield
+    finally:
+        os.environ["PATH"] = path
+        calls = fake_calls(folder)[before:]
+        tools: dict[str, int] = {}
+        for call in calls:
+            tools[call["tool"]] = tools.get(call["tool"], 0) + 1
+        read = sorted({c["post"] for c in calls if c["post"]})
+        missing = sorted({c["link"] for c in calls if c["link"] and not c["post"]})
+        print(f"--- {folder.name}: fake posts, {len(calls)} tool calls "
+              f"({', '.join(f'{t} {n}' for t, n in sorted(tools.items())) or 'none'}), posts read: "
+              f"{', '.join(read) or 'none'}", flush=True)
+        if missing:
+            print(f"--- {folder.name}: no recorded post for {', '.join(missing)}: each read failed as `error`. "
+                  f"Add it to {FIXTURES.relative_to(REPO)} or run the eval with --live-posts.", flush=True)
+
+
+def live_posts(flags: dict[str, bool], folder: pathlib.Path, eval_key: tuple[str, int] | None) -> bool:
+    """--live-posts or --fake-posts when given; else what a resumed run started with; else LIVE_POSTS."""
+    if flags["live-posts"] or flags["fake-posts"]:
+        return flags["live-posts"]
+    started = folder / "posts.txt"
+    if eval_key is None and started.exists():
+        return started.read_text(encoding="utf-8").strip() == "live"
+    return eval_key in LIVE_POSTS
+
+
 # --- All -----------------------------------------------------------------------------------------
 
-def options(argv: list[str]) -> tuple[dict[str, str], list[str]]:
-    """Split the --agent, --model, --opencode-bin and --codex-bin options from the positional arguments."""
+FLAGS = ("fake-posts", "live-posts")
+
+
+def options(argv: list[str]) -> tuple[dict[str, str], dict[str, bool], list[str]]:
+    """Split the --agent, --model, --opencode-bin and --codex-bin options and the flags from the positional arguments."""
     found = {"agent": "claude", "model": "", "opencode-bin": os.environ.get("OPENCODE_BIN", "opencode"),
              "codex-bin": os.environ.get("CODEX_BIN", "")}
+    flags = {name: False for name in FLAGS}
     rest: list[str] = []
     args = iter(argv)
     for arg in args:
         name, _, value = arg.partition("=")
-        if name.startswith("--") and name[2:] in found:
+        if name.startswith("--") and name[2:] in flags:
+            flags[name[2:]] = True
+        elif name.startswith("--") and name[2:] in found:
             found[name[2:]] = value or next(args, "")
         else:
             rest.append(arg)
-    return found, rest
+    if all(flags.values()):
+        sys.exit("Choose one of --fake-posts and --live-posts.")
+    return found, flags, rest
 
 
 def main() -> None:
-    opts, args = options(sys.argv[1:])
+    opts, flags, args = options(sys.argv[1:])
     agent, model, binary = opts["agent"], opts["model"], opts["opencode-bin"]
     if len(args) < 3 or args[0] not in APPS or (args[1] in ("resume", "prompt") and len(args) != 4):
         sys.exit(__doc__)
@@ -565,34 +661,38 @@ def main() -> None:
     local = load_local()
     library: str = local["libraries"][app]
     placeholders: dict[str, str] = local.get("placeholders", {})
-    env = opencode_env() if agent == "opencode" else {}
 
-    def start(name: str, memory: bool, prompt: str) -> pathlib.Path:
+    def start(name: str, memory: bool, prompt: str) -> None:
+        # Inside posts(): the environment, PATH included, has the stand-ins first. opencode_env() copies it,
+        # codex exec inherits it, and schedule.prepare_codex_folder records it in the run folder.
         if agent == "codex":
             folder = codex_prepare(model, app, name, library, memory)
             codex_run(folder, codex_command(binary, model, prompt), model)
         elif agent == "opencode":
             folder = opencode_prepare(model, app, name, library, memory)
-            opencode_run(folder, opencode_command(binary, model, prompt), env, binary, model)
+            opencode_run(folder, opencode_command(binary, model, prompt), opencode_env(), binary, model)
         else:
             folder = prepare(app, name, library, memory)
             run(folder, command(app, prompt), app)
-        return folder
 
     bases = {"claude": RUNS, "opencode": opencode_base(model) if agent == "opencode" else RUNS,
              "codex": codex_base(model) if agent == "codex" else RUNS}
     if kind == "resume":
         folder = bases[agent] / app / args[2]
         session = (folder / "session.txt").read_text(encoding="utf-8").strip()
-        if agent == "codex":
-            codex_run(folder, codex_command(binary, model, args[3], session), model, resume=True)
-        elif agent == "opencode":
-            opencode_run(folder, opencode_command(binary, model, args[3], session), env, binary, model, resume=True)
-        else:
-            run(folder, [*command(app, args[3]), "--resume", session], app, resume=True)
+        with posts(folder, live_posts(flags, folder, None)):
+            if agent == "codex":
+                codex_run(folder, codex_command(binary, model, args[3], session), model, resume=True)
+            elif agent == "opencode":
+                opencode_run(folder, opencode_command(binary, model, args[3], session), opencode_env(), binary, model,
+                             resume=True)
+            else:
+                run(folder, [*command(app, args[3]), "--resume", session], app, resume=True)
         return
     if kind == "prompt":
-        start(args[2], True, fill(args[3], app, placeholders))
+        folder = bases[agent] / app / args[2]
+        with posts(folder, flags["live-posts"]):
+            start(args[2], True, fill(args[3], app, placeholders))
         return
 
     evals = {e["id"]: e for e in json.loads((HERE / f"{kind}.json").read_text(encoding="utf-8"))["evals"]}
@@ -601,11 +701,16 @@ def main() -> None:
         name = f"{kind}-{eval_id}"
         folder = bases[agent] / app / name
         folder.mkdir(parents=True, exist_ok=True)
+        live = live_posts(flags, folder, (kind, eval_id))
         on = {"opencode": f" in OpenCode on {model}", "codex": f" in Codex on {model}"}.get(agent, "")
         lines = [f"# {kind} {eval_id} on {APPS[app]['name']}{on}", "", fill(spec["expected_output"], app, placeholders), ""]
         lines += [f"- {fill(x, app, placeholders)}" for x in spec["expectations"]]
+        if not live:
+            lines += ["", f"Posts were fake: each post's caption, transcript and images are the ones recorded in "
+                      f"{FIXTURES.relative_to(REPO)}/<platform>-<id>/post.json, not the live post's."]
         (folder / "expectations.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        start(name, (kind, eval_id) not in NO_MEMORY, fill(spec["prompt"], app, placeholders))
+        with posts(folder, live):
+            start(name, (kind, eval_id) not in NO_MEMORY, fill(spec["prompt"], app, placeholders))
 
 
 if __name__ == "__main__":

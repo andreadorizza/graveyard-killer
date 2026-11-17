@@ -16,9 +16,9 @@ Every eval runs against a test Library that exists only for evals, never the use
 `run_evals.py` runs each eval in a fresh headless `claude -p` session, with the plugin loaded from this repo, in a folder outside the repo whose `CLAUDE.md` holds only the test Library's pointer. It keeps your own `~/.claude/CLAUDE.md`, which may point to your real Library, out of the session, and denies reading anything under `~/.claude`: an agent that finds no pointer searches for one, and on 2026-11-13 eval 12 found the real pointer that way and filed into the real Library. It allows only the connectors of the app under test, and only the skill's own scripts.
 
 ```
-python3 evals/run_evals.py <notion|google-drive> <capture|worker|drive> <id> [<id> ...]
-python3 evals/run_evals.py <notion|google-drive> resume <run> "<reply>"
-python3 evals/run_evals.py <notion|google-drive> prompt <run> "<message>"
+python3 evals/run_evals.py [--fake-posts|--live-posts] <notion|google-drive> <capture|worker|drive> <id> [<id> ...]
+python3 evals/run_evals.py [--fake-posts|--live-posts] <notion|google-drive> resume <run> "<reply>"
+python3 evals/run_evals.py [--fake-posts|--live-posts] <notion|google-drive> prompt <run> "<message>"
 ```
 
 `resume` answers a run in its own session, such as "sì" to a Ping. `prompt` sends any message with the test Library's pointer in place. Each run leaves its stream, its final message and the expectations to grade in `gk-evals/<app>/<run>/` in the system temp folder. Grade by reading the test Library.
@@ -44,6 +44,34 @@ It reads `evals/local.json`, which is not committed:
 The reel and the carousel are public posts; the reel's two links are the same post. The gated post is one that Instagram shows only to signed-in users, such as a post from an account with an age limit: a logged-out browser shows a notice instead of the post, and `post.py read` gives `login_only`.
 
 About 15 sessions use up Notion's hourly query allowance on plans below Business: run the Notion evals in batches.
+
+### Fake posts
+
+Instagram flags an IP that reads the same post again and again: on 2026-11-17 one reel was downloaded about 10 times in a day of eval runs from one Mac. So the runner fakes the posts by default. Before each session it puts stand-ins for `yt-dlp`, `gallery-dl`, `parakeet-mlx`, `mlx_whisper` and `whisper-ctranslate2` first on PATH, in `<run>/fakes/bin`. The skill's `post.py` runs as it always does, with the real `ffmpeg` and `ffprobe`, and the stand-ins answer from the posts recorded in [fixtures/posts](fixtures/posts):
+
+| Recorded post | Used by |
+|---|---|
+| `instagram-DPDm7KmjQMq`, the reel of `{{INSTAGRAM_REEL_URL}}` and `{{INSTAGRAM_REEL_URL_AS_P}}` | Worker 1, 11 |
+| `instagram-De3Y-5XmtD6`, the carousel of `{{INSTAGRAM_CAROUSEL_URL}}` | a Worker run after Capture 2 |
+| `youtube-dQw4w9WgXcQ` | Worker 3, 15; Drive 4 |
+| `youtube-jNQXAC9IVRw` | Drive 1 |
+| `youtube-aaaa`, the truncated link | Worker 15, 16 |
+
+A post matches by platform and id, so `/reel/`, `/p/` and tracking parameters all find it. Any other link fails as a broken download does: `post.py read` gives `error`, and the runner names the link after the run. A `local.json` placeholder that points at another post needs a recording too.
+
+Each recording keeps what a real `post.py read` gave (the kind, the author, the duration, the transcript's source and language), with its own short caption and transcript and small made-up images and video in place of the creator's: the repository is public. A new recording is a folder named `<platform>-<id>` with a `post.json` in the same shape: `info` is what `yt-dlp --dump-single-json` prints, `speech` what the speech engine hears, `subtitles` a caption track's VTT, `images` a carousel's slides, and `error` the last line a failed read printed.
+
+Each run writes `posts.txt` (fake or live) and `fakes/calls.jsonl`, one line per stand-in call with the post it matched. The runner prints a count after each session. A resumed run keeps the posts it started with. `expectations.md` says when posts were fake: grade the caption and the transcript against the recording, not the live post.
+
+**Live posts.** The evals that test the platforms themselves read real posts: Worker 2 and 4 (TikTok's short links), 5 (how YouTube reports a missing video), 13, 14 and 19 (Instagram's posts for signed-in users). They are `LIVE_POSTS` in `run_evals.py`. `--live-posts` makes any run read real posts; `--fake-posts` fakes them in a live eval too. Capture runs no download, so the setting changes nothing there.
+
+**The live stage, once per release.** Fake posts test what the agent does with a read, not the platforms: a change on Instagram, TikTok or YouTube that breaks `yt-dlp` or `gallery-dl`, the real speech engines, and real frames all need real posts. So on the `release-<version>` branch, after the evals pass with fake posts, run this once before the merge to `main`:
+
+1. `uv run pytest -m live`: the real tools read one YouTube video. It never touches Instagram.
+2. Seed the reel and the YouTube Entries with Capture evals 1 and 5, in a test Library that holds neither post yet. Then run `python3 evals/run_evals.py --live-posts notion worker 1` and grade Worker evals 1 and 3. That is two real reads, one on Instagram.
+3. Run the live evals (Worker 2, 4, 5, 13, 14 and 19) only when the release changes what they test: TikTok links, posts for signed-in users, or how a failed read is reported.
+
+If a live read differs from its recording in kind, author, duration or the transcript's source or language, update the recording's `post.json` to match. That is about three real reads per release, instead of one per eval run.
 
 ### On OpenCode's free models
 
@@ -107,7 +135,7 @@ These evals cannot cover what only the phone shows: whether the skill loads in t
 
 Every prompt is "run the Graveyard Killer worker". What differs is the Library's state before the run, which each eval's `expected_output` describes as its seed. Seed it by sharing from the phone, by a Capture eval, or by writing the Entries into the test Library by hand.
 
-The Worker downloads and transcribes, so the tools from `post.py check` must be installed first.
+The Worker downloads and transcribes. With fake posts it needs only `ffmpeg`; the live evals need every tool from `post.py check`.
 
 **Upgrades.** Eval 18 starts from a Library made by an older version: replace the test Library's Settings with [fixtures/settings-0.3.0.md](fixtures/settings-0.3.0.md) (on Drive, write it into the `Settings` tab as library-google-drive.md's Layout says, keeping the Folders section). The fixture is frozen: never update it to the current Settings. A release that adds an upgrade step runs eval 18 ([ADR-0006](../docs/adr/0006-libraries-upgrade-themselves.md)).
 
@@ -115,7 +143,7 @@ The Worker downloads and transcribes, so the tools from `post.py check` must be 
 - Evals 1 to 3 can share one run, after Capture evals 1, 4 and 5: then check each eval's expectations.
 - Eval 4 needs a processed TikTok Entry, so run it after eval 2.
 - Eval 8 (an article) stands alone. Eval 9 checks after any run.
-- Eval 11 needs a shared save made through the app's share route, of a reel that is not in the Library yet. Eval 12 needs "Ping by" set to `none` and an empty Preferences table in the test Library's Settings.
+- Eval 11 needs a shared save made through the app's share route, of a reel that is not in the Library yet: with fake posts, the recorded reel. Eval 12 needs "Ping by" set to `none` and an empty Preferences table in the test Library's Settings.
 - Eval 14 runs right after eval 13. Evals 15 and 16 seed a Note with a try count by hand; eval 16 needs no other YouTube Entry waiting.
 - Evals 13, 14 and 19 test gated posts. No eval uses a real login: keep the test Library's Instagram login Browser empty, except for eval 19's seed, which is not a browser. Login reads themselves are checked by hand on the maintainer's computer, with each browser that [login.md](../plugin/skills/graveyard-killer/references/login.md#browsers) offers, before each release that changes them.
 

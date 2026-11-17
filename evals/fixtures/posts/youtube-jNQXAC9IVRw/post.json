@@ -1,0 +1,22 @@
+{
+  "link": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+  "recorded": "post.py read, 2026-11-17: video, 19 s, author jawed, Parakeet transcript (no caption track). Text and media are stand-ins.",
+  "info": {
+    "id": "jNQXAC9IVRw",
+    "webpage_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "extractor_key": "Youtube",
+    "title": "Me at the zoo",
+    "uploader": "jawed",
+    "channel": "jawed",
+    "description": "A short clip from a visit to the zoo, in front of the elephants.",
+    "duration": 19,
+    "subtitles": {},
+    "automatic_captions": {}
+  },
+  "media": "media.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "speech": {
+    "text": "Here we are at the zoo, standing by the elephants. What I like about them is how long their trunks are. That's about it.",
+    "language": null
+  }
+}

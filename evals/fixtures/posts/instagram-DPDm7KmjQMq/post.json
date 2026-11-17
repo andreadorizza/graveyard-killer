@@ -1,0 +1,20 @@
+{
+  "link": "https://www.instagram.com/p/DPDm7KmjQMq/",
+  "recorded": "post.py read, 2026-11-17: video, author camillabrossa, no duration, Parakeet transcript, 6 keyframes. Text and media are stand-ins.",
+  "info": {
+    "id": "DPDm7KmjQMq",
+    "webpage_url": "https://www.instagram.com/p/DPDm7KmjQMq/",
+    "extractor_key": "Instagram",
+    "title": "Video by camillabrossa",
+    "channel": "camillabrossa",
+    "uploader": "Camilla Brossa",
+    "description": "Come sarà l'AI nel 2027? 🤖\n\nHo riassunto in un minuto uno scenario sul futuro dell'intelligenza artificiale: agenti che lavorano da soli, ricerca che accelera e le domande che dovremmo farci già adesso.\n\nSalva il video e dimmi nei commenti cosa ne pensi 👇\n\n#intelligenzaartificiale #AI #futuro",
+    "duration": null
+  },
+  "media": "media.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "speech": {
+    "text": "Proviamo a immaginare il 2027. Secondo alcuni ricercatori, gli assistenti di intelligenza artificiale potrebbero diventare agenti capaci di lavorare per giorni senza aiuto. Questo cambierebbe il modo in cui facciamo ricerca, scriviamo codice e prendiamo decisioni. Ma ci sono anche dei rischi: chi controlla questi sistemi, e come verifichiamo che facciano quello che vogliamo? In questo video ti spiego i tre punti che secondo me contano di più.",
+    "language": null
+  }
+}
