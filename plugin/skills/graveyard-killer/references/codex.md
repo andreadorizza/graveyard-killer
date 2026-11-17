@@ -41,7 +41,7 @@ Tell the user [what OpenAI keeps](#what-openai-keeps) first. Then [Setup](setup.
 - **Step 6, the pointer:** it goes in `~/.codex/AGENTS.md`, which Codex reads in every chat. Add [the pointer](setup.md#the-pointer) at the end of that file, creating it if needed, with the user's OK.
 - **Step 7, the schedule:** [schedule the Worker](#schedule-the-worker) below.
 - **Step 8, the phone:** as written. To answer a Ping from the phone, the Claude app works on its free plan, with connectors: the user connects Notion to Claude, in *Customize → Connectors* on claude.ai, and pastes the pointer into their Instructions.
-- **Step 9, Pings:** as written, except that Codex has no push tool: `push` shows a notification on this computer through `post.py notify` ([ping.md](ping.md#send-it)). On a Mac it comes from Script Editor: if it does not show, the user turns on notifications for Script Editor in *System Settings → Notifications*. Offer `email` only when you have a Gmail tool. The whole Ping waits in the run's chat, under *Scheduled* in the ChatGPT app.
+- **Step 9, Pings:** as written, except that Codex has no push tool: `push` shows a notification on this computer through `post.py notify` ([ping.md](ping.md#send-it)). Send the test Ping outside the sandbox: run `post.py notify` as [Run the scripts](#run-the-scripts) says, asking for the user's approval, since in the sandbox it cannot show a notification. On a Mac it comes from Script Editor: if it does not show, the user turns on notifications for Script Editor in *System Settings → Notifications*. Offer `email` only when you have a Gmail tool. The whole Ping waits in the run's chat, under *Scheduled* in the ChatGPT app.
 - **Step 11, updates:** to get a new version, the user tells Codex "update Graveyard Killer", which [updates the skills](#update).
 
 ## Schedule the Worker
@@ -49,15 +49,17 @@ Tell the user [what OpenAI keeps](#what-openai-keeps) first. Then [Setup](setup.
 The ChatGPT app's Scheduled tasks start the Worker, so the user sees each run, its Ping and its time under *Scheduled*. But the app runs a task with the user's default permissions, which read the whole disk, and a post is untrusted input. So the task runs one command, `schedule.py codex-run`, which runs the Worker with `codex exec` in its own run folder. There the folder's settings fence the run: its commands may read only the skills and that folder, and reach no network, and only the skill's own scripts run outside that sandbox. The task's chat gives the user the Ping that `codex-run` prints. Done when the task shows in the app's *Scheduled* view.
 
 1. **Read the schedule** from the Settings, as schedule.md's step 1 says.
-2. **Prepare the run folder.** The run folder is `graveyard-killer` in the user's home folder: never under Desktop, Documents or Downloads, where macOS asks before an app reads them. Run the script from this skill's folder, by its full path, with the line a failed run shows, in the Settings language:
+2. **Prepare the run folder.** The run folder is `graveyard-killer-codex` in the user's home folder: never under Desktop, Documents or Downloads, where macOS asks before an app reads them, and never OpenCode's `graveyard-killer`, which the script refuses. Run the script from this skill's folder, by its full path, with the line a failed run shows, in the Settings language:
 
    ```
-   python3 ~/.agents/skills/graveyard-killer/scripts/schedule.py codex --folder ~/graveyard-killer --library "<the Library link>" --alert "Graveyard Killer non è riuscito a fare il riordino di oggi."
+   python3 ~/.agents/skills/graveyard-killer/scripts/schedule.py codex --folder ~/graveyard-killer-codex --library "<the Library link>" --alert "Graveyard Killer non è riuscito a fare il riordino di oggi."
    ```
+
+   When the app has a Graveyard Killer task already whose prompt runs `codex-run` in another folder, such as `~/graveyard-killer` from version 0.11.0, add `--old-folder` with that folder: the script removes the files it wrote there, so that OpenCode's Worker can have that folder.
 
    It prints one JSON object; `"error"` means it did nothing. It writes the folder's `AGENTS.md` with the pointer, unless one is there, and its `.codex` folder: the sandbox's profile and rules, the Library link and the alert, Notion's server, approved for writes since nobody watches the run, and the Worker's model, GPT-6 Luna at high effort. `codex-run` gives the unattended run only the Notion tools a Worker needs: never one that deletes, moves or shares. It also marks the folder as trusted in `~/.codex/config.toml`, since Codex ignores an untrusted folder's `.codex`. Done when it lists what it wrote.
 
-3. **Create the task** with your scheduling tool, which asks the user to approve it. If you have none, walk the user through *Scheduled → New task* in the app's sidebar with the same values. Done when the task shows in *Scheduled*.
+3. **Create the task** with your scheduling tool, which asks the user to approve it. When a Graveyard Killer task is there already, update it with these values instead of adding a second one. If you have no scheduling tool, walk the user through *Scheduled → New task* in the app's sidebar, or the task's *Edit*, with the same values. Done when the task shows in *Scheduled*.
    - a standalone task, which starts a new chat for each run
    - **project:** the run folder
    - **name:** "Graveyard Killer: tidy-up", in the Settings language ("Graveyard Killer: riordino")
@@ -68,17 +70,19 @@ The ChatGPT app's Scheduled tasks start the Worker, so the user sees each run, i
 
 4. **Tell the user**, in the Settings language, the time of the runs, and that a run happens only while the ChatGPT app is running and the computer is awake. Each run's chat, with its Ping, is under *Scheduled* in the app, where they can also change the time or run it now. The run's log is `worker.log` in the run folder.
 
-Prepare the run folder again after moving the skills or the folder.
+Prepare the run folder again after moving the skills or the folder, with `--old-folder` for a moved folder.
 
 ## Run the scripts
 
 In the run folder, every command runs in Codex's sandbox, where the scripts find no Python, no network and no GPU, except the skill's own scripts called in the one form the folder's rules let out:
 
 - by their full path, written out as the folder's `AGENTS.md` gives it, such as `python3 /Users/<name>/.agents/skills/graveyard-killer/scripts/post.py`, never with `~` or `scripts/`;
-- with the link or the text as arguments in single quotes, never through a heredoc or a pipe, which keep the whole command in the sandbox. So `python3 <scripts>/post.py read --language it '<the Entry's Link>'`, `python3 <scripts>/link.py '<the link>'` and `python3 <scripts>/post.py notify 'Graveyard Killer' '<one short line>'`. Write a `'` inside a link as `%27`, and leave a `'` out of a notification's line;
+- with the link or the text as arguments in single quotes, never through a heredoc or a pipe, which keep the whole command in the sandbox. So `python3 <scripts>/post.py read --language it '<the Entry's Link>'`, `python3 <scripts>/link.py '<the link>'`, `python3 <scripts>/post.py notify 'Graveyard Killer' '<one short line>'` and, for a cover, `python3 <scripts>/post.py upload '<image>' '<upload URL>' --header '<name>: <value>'`. Write a `'` inside a link as `%27`, and leave a `'` out of a notification's line;
 - one command at a time, or joined with `&&`.
 
-A script that fails with "No developer tools were found" or "Operation not permitted" ran in the sandbox: run it again in this form. Never install anything because of such an error.
+A script that fails with "No developer tools were found" or "Operation not permitted", or a `post.py notify` whose reason names error -2741 ("syntax error: Expected end of line but found identifier"), ran in the sandbox: run it again in this form. Never install anything because of such an error.
+
+In a chat anywhere else, Setup's included, a command starts in that chat's sandbox, and no rules let the scripts out. So run the skill's scripts in the same form, and ask the user to approve running them outside the sandbox.
 
 ## Update
 

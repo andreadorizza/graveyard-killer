@@ -41,10 +41,11 @@ Then:
 
 What is different from the paid route:
 
-- **Pings** come as a notification on your computer, or not at all: OpenCode has no email connector. The whole message waits in the run's chat in OpenCode, in the `graveyard-killer` folder in your home folder. You can also answer from the Claude app on your phone, which works on the free plan: connect Notion to Claude and paste Setup's two lines into your Instructions.
-- **Free models are free "for a limited time"**, as OpenCode says. They also have a usage limit that OpenCode does not show: when a run hits it, it switches to the second model, GLM-5.3-Flash Free. When a model goes for good, you pick a new one.
+- **Pings** come as a notification on your computer, or not at all: OpenCode has no email connector. The whole message waits in the run's chat in OpenCode, in the `graveyard-killer` folder in your home folder. Answer it there.
+- **Your phone.** Save through Notion's share menu, which needs no Claude. The free route installs Graveyard Killer's skills in OpenCode only, so a chat in the Claude app, free plan included, does not have them: it cannot be counted on to file a post you share to it, find what you saved or answer a Ping by its number. Claude's free plan has the Notion connector and lets you [upload a skill](https://support.claude.com/en/articles/12512180-use-skills-in-claude), but Graveyard Killer is untested there.
+- **Free models are free "for a limited time"**, as OpenCode says. They also have a usage limit that OpenCode does not show. In the tests, DeepSeek and GLM-5.3-Flash Free, the second model, reached it together after about 75 minutes of back-to-back runs, and stayed blocked for more than an hour and a half. So the second model does not help then: the run shows a notification, and the next run reads what it left. The second model takes over when the first goes for good; then you pick a new one.
 - **Updates**: tell OpenCode "update Graveyard Killer".
-- Untested: Windows, Linux, OpenCode's desktop app and OpenCode 2.x. The tests used OpenCode 1.19.5 in a terminal on a Mac. Capture and Recall in a free Claude chat are untested too.
+- Untested: Windows, Linux, OpenCode's desktop app and OpenCode 2.x. The tests used OpenCode 1.19.5 in a terminal on a Mac.
 
 ## Codex
 

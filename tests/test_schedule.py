@@ -6,6 +6,7 @@ import json
 import os
 import plistlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -451,6 +452,7 @@ def test_a_run_gives_opencode_the_whole_prompt_and_logs_the_ping(
     assert "Graveyard Killer Library: https://app.notion.com/p/41af4b208c4081c2?v=1&x=$HOME\n" in call["argv"][-1]
     assert Path(call["cwd"]).resolve() == folder
     assert call["disable_claude_code"] == "1"
+    assert call["disable_external_skills"] == "1"  # a copy in ~/.agents/skills would shadow this one
     assert call["tmpdir"] == tempfile.gettempdir()  # where opencode.json lets the Worker read
     assert alerts == []
     log = (folder / "worker.log").read_text()
@@ -616,8 +618,8 @@ def codex_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return home
 
 
-def codex_folder(capsys: pytest.CaptureFixture[str], folder: Path) -> dict[str, Any]:
-    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY)
+def codex_folder(capsys: pytest.CaptureFixture[str], folder: Path, *extra: str) -> dict[str, Any]:
+    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY, *extra)
     assert code == 0, out
     return out
 
@@ -687,6 +689,45 @@ def test_the_codex_rules_let_out_only_the_skill_s_scripts_by_full_path(
     assert "scripts/post.py\"" not in rules.replace(str(SCRIPTS.resolve()), "")  # no relative call
 
 
+def rules_allow(rules: str, command: str) -> bool:
+    """Whether a prefix rule matches the command's words, as Codex checks a plain command."""
+    words = shlex.split(command)
+    for pattern in (json.loads(found) for found in re.findall(r"pattern = (\[.*\]),\n", rules)):
+        if len(words) >= len(pattern) and all(
+                word in (part if isinstance(part, list) else [part]) for word, part in zip(words, pattern)):
+            return True
+    return False
+
+
+def test_the_codex_rules_let_out_a_cover_upload_by_full_path_only(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    """library-notion.md's cover upload, in codex.md's form: full path, arguments in single quotes."""
+    codex_folder(capsys, folder)
+    rules = (folder / ".codex/rules/graveyard-killer.rules").read_text()
+    post_py = SCRIPTS.resolve() / "post.py"
+    arguments = (f"upload '{folder}/work/graveyard-killer-k0nqhi_5/thumbnail.jpg' "
+                 "'https://api.notion.com/v1/file_uploads/abc/send' "
+                 "--header 'Authorization: Bearer ntn_x' --header 'Notion-Version: 2022-06-28'")
+
+    assert rules_allow(rules, f"python3 {post_py} {arguments}")
+    assert not rules_allow(rules, f"python3 scripts/post.py {arguments}")
+    assert not rules_allow(rules, "curl -F file=@thumbnail.jpg https://api.notion.com/v1/file_uploads/abc/send")
+
+
+def test_the_unattended_codex_run_can_upload_a_cover_and_never_delete_move_or_share() -> None:
+    tomllib = pytest.importorskip("tomllib")
+    flag, value = schedule.codex_exec_options()
+    key, toml = value.split("=", 1)
+    assert (flag, key) == ("-c", "mcp_servers.notion.enabled_tools")
+    enabled = tomllib.loads(f"tools = {toml}")["tools"]  # codex parses a -c value as TOML
+
+    # library-notion.md's "Set the cover" starts with a file upload: without it no Entry gets a Cover.
+    assert "notion-create-file-upload" in enabled
+    assert {"notion-fetch", "notion-create-pages", "notion-update-page"} <= set(enabled)
+    assert not [tool for tool in enabled if re.search(r"delete|move|share|duplicate|restore|comment", tool)]
+
+
 def test_codex_again_keeps_the_pointer_and_trusts_the_folder_once(
     codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
 ) -> None:
@@ -740,6 +781,67 @@ def test_codex_needs_codex_s_command(
     monkeypatch.setattr(schedule, "find_codex", lambda: None)
     code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY)
     assert code == 2 and "codex" in out["error"]
+    assert not folder.exists()
+
+
+def test_codex_refuses_opencode_s_run_folder(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    """Two routes in one folder would share its AGENTS.md and run the Worker twice a day."""
+    folder.mkdir(parents=True)
+    (folder / "schedule.json").write_text("{}")
+    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY)
+    assert code == 2 and "OpenCode's run folder" in out["error"] and "~/graveyard-killer-codex" in out["error"]
+    assert not (folder / ".codex").exists() and not (folder / "AGENTS.md").exists()
+
+
+def test_install_refuses_codex_s_run_folder(
+    computer: Callable[[str], Calls], codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    calls = computer("Darwin")
+    schedule.prepare_codex_folder(folder, LIBRARY)
+    code, out = cli(capsys, "install", "--time", "9:05", "--model", MODEL, "--folder", str(folder), "--library", LIBRARY)
+    assert code == 2 and "Codex's run folder" in out["error"]
+    assert not (folder / "opencode.json").exists() and calls == []
+
+
+def test_codex_moves_out_of_a_folder_it_shared_with_opencode(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], tmp_path: Path, folder: Path
+) -> None:
+    """0.11.0's Codex run folder was ~/graveyard-killer, OpenCode's too: --old-folder takes Codex's files out."""
+    old = (tmp_path / "graveyard-killer").resolve()
+    schedule.prepare_codex_folder(old, LIBRARY)
+    for kept in ("schedule.json", "opencode.json", "worker.log"):
+        (old / kept).write_text("OpenCode's\n")
+    out = codex_folder(capsys, folder, "--old-folder", str(old))
+
+    assert sorted(out["removed"]) == sorted([str(old / ".codex/graveyard-killer.json"), str(old / ".codex/config.toml"),
+                                             str(old / ".codex/rules/graveyard-killer.rules"),
+                                             f"{old / 'AGENTS.md'}: Codex's scripts line"])
+    assert not (old / ".codex").exists() and not (old / "work").exists()
+    assert (old / "AGENTS.md").read_text() == schedule.POINTER.format(library=LIBRARY)
+    assert all((old / kept).read_text() == "OpenCode's\n" for kept in ("schedule.json", "opencode.json", "worker.log"))
+    assert (folder / ".codex/graveyard-killer.json").is_file()
+    assert f"codex-run --folder '{folder}'" in out["prompt"]
+
+
+def test_codex_leaves_a_codex_config_it_did_not_write(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], tmp_path: Path, folder: Path
+) -> None:
+    old = tmp_path / "old"
+    schedule.prepare_codex_folder(old, LIBRARY)
+    (old / ".codex/config.toml").write_text('model = "my own"\n')
+    out = codex_folder(capsys, folder, "--old-folder", str(old))
+    assert str(old.resolve() / ".codex/config.toml") not in out["removed"]
+    assert (old / ".codex/config.toml").read_text() == 'model = "my own"\n'
+    assert not (old / ".codex/graveyard-killer.json").exists()
+
+
+def test_codex_refuses_its_own_folder_as_the_old_one(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY, "--old-folder", str(folder))
+    assert code == 2 and "--old-folder" in out["error"]
     assert not folder.exists()
 
 

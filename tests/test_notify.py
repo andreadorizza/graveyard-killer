@@ -113,3 +113,15 @@ def test_on_windows_the_text_goes_in_the_environment_not_the_script(commands: Ca
     assert options["env"]["GK_NOTIFY_TITLE"] == TITLE
     assert options["env"]["GK_NOTIFY_MESSAGE"] == MESSAGE
     assert "$env:GK_NOTIFY_MESSAGE" in post.WINDOWS_TOAST
+
+
+def test_on_macos_a_sandboxed_osascript_says_to_run_outside_the_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
+    """In Codex's sandbox osascript cannot load `display notification`, and fails to compile."""
+    sandboxed = "20:32: syntax error: Expected end of line but found identifier. (-2741)\n"
+    monkeypatch.setattr(post, "system", lambda: "Darwin")
+    monkeypatch.setattr(shutil, "which", lambda name: f"/found/{name}")
+    monkeypatch.setattr(subprocess, "run",
+                        lambda command, **_: subprocess.CompletedProcess(command, 1, "", sandboxed))
+    result = post.notify(TITLE, MESSAGE)
+    assert result["notified"] is False
+    assert "-2741" in result["reason"] and "outside the sandbox" in result["reason"]
