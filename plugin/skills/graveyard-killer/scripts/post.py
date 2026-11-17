@@ -4,7 +4,8 @@
     post.py read [<link>] [--language <code>]   the link comes on stdin when left out
     post.py clean <folder>           delete a work folder that read made
     post.py pause                    wait a random 6 to 12 seconds, between Instagram posts
-    post.py notify                   show a desktop notification: a title, then one line, on stdin
+    post.py notify [<title> <line>]  show a desktop notification: a title, then one line, on stdin
+                                     when left out
 
 Calls yt-dlp, gallery-dl, ffmpeg, ffprobe, Parakeet and Whisper as outside
 programs found on PATH. When Windows Smart App Control blocks a tool that uv
@@ -518,7 +519,11 @@ def download(link: str, folder: Path) -> subprocess.CompletedProcess[str]:
 
 
 def not_ok(link: str, folder: Path, tool_output: str) -> dict[str, Any]:
-    """The result for a post that could not be read: login_only, needs_login, unavailable or error."""
+    """The result for a post that could not be read: login_only, needs_login, unavailable or error.
+
+    Its work folder holds nothing the Worker uses, so it goes now, and `work` is null: a run that
+    forgot to clean after a failed read left one behind (Codex, 2026-11-17)."""
+    shutil.rmtree(folder, ignore_errors=True)
     reason = last_error(tool_output)
     if matches(reason, LOGIN_ONLY):
         status = "login_only"
@@ -535,7 +540,7 @@ def not_ok(link: str, folder: Path, tool_output: str) -> dict[str, Any]:
         "platform": canonical.get("platform"),
         "link": canonical.get("link", link),
         "id": canonical.get("id"),
-        "work": str(folder),
+        "work": None,
     }
 
 
@@ -733,7 +738,9 @@ def main() -> None:
     read_parser.add_argument("--language", help="the spoken language when known, such as it")
     commands.add_parser("check")
     commands.add_parser("pause")
-    commands.add_parser("notify", help="a title on the first line of stdin, the message on the next")
+    notify_parser = commands.add_parser("notify", help="a title on the first line of stdin, the message on the next")
+    # As arguments too: Codex lets a script out of its sandbox only when the command has no heredoc.
+    notify_parser.add_argument("text", nargs="*", help="the title, then the message; stdin when left out")
     clean_parser = commands.add_parser("clean")
     clean_parser.add_argument("folder", type=Path)
     args = parser.parse_args()
@@ -742,7 +749,8 @@ def main() -> None:
     elif args.command == "pause":
         print(json.dumps(pause()))
     elif args.command == "notify":
-        lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
+        given = args.text or sys.stdin.read().splitlines()
+        lines = [line.strip() for line in given if line.strip()]
         if len(lines) < 2:
             print(json.dumps({"notified": False, "reason": "stdin needs a title line and a message line"}))
             sys.exit(2)

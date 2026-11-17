@@ -8,13 +8,14 @@ Usage:
 <app> is `notion` or `google-drive`. `resume` answers a finished run in its own
 session. `prompt` runs any message against the test Library, for example to seed it.
 
-The agent is `claude` (`claude -p`, the default) or `opencode` (`opencode run`, Notion only),
-which needs `--model`, such as `opencode/glm-5.3-flash-free`. `--opencode-bin`, or OPENCODE_BIN,
-names another OpenCode command.
+The agent is `claude` (`claude -p`, the default), `opencode` (`opencode run`, Notion only),
+which needs `--model`, such as `opencode/glm-5.3-flash-free`, or `codex` (`codex exec`, Notion
+only), whose `--model` defaults to the scheduled task's, gpt-6-luna. `--opencode-bin`, or
+OPENCODE_BIN, names another OpenCode command; `--codex-bin`, or CODEX_BIN, another Codex.
 
-Each run writes <temp folder>/gk-evals/<app>/<run>/, or gk-evals/opencode/<model>/<app>/<run>/:
+Each run writes <temp folder>/gk-evals/<app>/<run>/, or gk-evals/<agent>/<model>/<app>/<run>/:
 out.jsonl (the session's stream), result.txt (its final message), session.txt,
-expectations.md (what to grade) and, for OpenCode, stats.json (time, steps, tokens).
+expectations.md (what to grade) and, for OpenCode and Codex, stats.json (time, steps, tokens).
 evals/local.json, which is not committed, holds each app's test Library link and
 the placeholders' values; see evals/README.md.
 """
@@ -70,6 +71,10 @@ DISALLOWED = ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar", "PushNot
 # OpenCode: the free route is Notion only (ADR-0007).
 OPENCODE_APPS = {"notion"}
 OPENCODE_TIMEOUT = 7200  # A free model is slow: the #17 prototype took 42 minutes for 4 Entries.
+# Codex: Notion only too (ADR-0008). The ChatGPT app bundles its own `codex` on macOS.
+CODEX_APPS = {"notion"}
+CODEX_TIMEOUT = 7200
+CODEX_APP_CLI = pathlib.Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex")
 
 
 def load_local() -> dict[str, Any]:
@@ -370,11 +375,159 @@ def opencode_run(folder: pathlib.Path, cmd: list[str], env: dict[str, str], bina
           f"{stats['tool_errors']} of {stats['tool_calls']} tool calls failed\n{result}\n", flush=True)
 
 
-# --- Both ----------------------------------------------------------------------------------------
+# --- Codex ---------------------------------------------------------------------------------------
+
+def codex_base(model: str) -> pathlib.Path:
+    return RUNS / "codex" / re.sub(r"[^A-Za-z0-9.-]+", "-", model)
+
+
+def codex_binary(given: str) -> str:
+    """--codex-bin or CODEX_BIN, then `codex` on PATH, then the ChatGPT app's own."""
+    found = given or shutil.which("codex") or (str(CODEX_APP_CLI) if CODEX_APP_CLI.exists() else "")
+    if not found:
+        sys.exit("Codex is not installed: install the ChatGPT desktop app, or name a `codex` with --codex-bin.")
+    return found
+
+
+def codex_home() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("CODEX_HOME") or HOME / ".codex")
+
+
+def codex_check_home() -> None:
+    """Codex reads ~/.codex/AGENTS.md in every chat, and Setup puts the user's pointer there."""
+    for name in ("AGENTS.override.md", "AGENTS.md"):
+        found = codex_home() / name
+        if found.exists() and "Graveyard Killer Library:" in found.read_text(encoding="utf-8"):
+            sys.exit(f"{found} holds a Graveyard Killer pointer: the eval sessions' only pointer must be the run "
+                     "folder's AGENTS.md. Move it aside while the evals run.")
+
+
+def codex_installed_skills() -> list[str]:
+    """`-c` options that switch off a copy of the skills installed in ~/.agents/skills, which Codex
+    reads in every folder, so that only this branch's copy in the run folder loads."""
+    paths = [HOME / ".agents" / "skills" / name / "SKILL.md" for name in ("graveyard-killer", "graveyard-killer-worker")]
+    entries = [f"{{path = {json.dumps(str(path))}, enabled = false}}" for path in paths if path.exists()]
+    return ["-c", f"skills.config=[{', '.join(entries)}]"] if entries else []
+
+
+def codex_prepare(model: str, app: str, name: str, library: str, memory: bool) -> pathlib.Path:
+    """A fresh run folder, cwd/, as `schedule.py codex` writes it for a scheduled task, with this branch's
+    skills in its .agents/skills, where Codex finds a folder's own skills.
+
+    The folder's .codex/config.toml and rules are the ones users get: commands read only the skills and
+    the folder and reach no network, and only the skills' scripts, by full path, run outside the sandbox.
+    schedule.py also marks the folder as trusted in Codex's config, since Codex ignores an untrusted
+    folder's .codex.
+    """
+    folder = codex_base(model) / app / name
+    cwd = folder / "cwd"
+    skills = cwd / ".agents" / "skills"
+    shutil.rmtree(skills, ignore_errors=True)
+    shutil.rmtree(cwd / schedule.CODEX_WORK, ignore_errors=True)
+    shutil.copytree(REPO / "plugin" / "skills", skills, ignore=shutil.ignore_patterns("__pycache__"))
+    pointer = cwd / "AGENTS.md"
+    pointer.write_text(f"Graveyard Killer Library: {library}\n" if memory else "", encoding="utf-8")
+    schedule.prepare_codex_folder(cwd, library, skills.resolve())
+    return folder
+
+
+def codex_command(binary: str, model: str, prompt: str, session: str = "") -> list[str]:
+    # `codex exec` never asks for an approval: what the run folder's sandbox refuses fails, as in a
+    # scheduled task. --skip-git-repo-check: the run folder is in no git repository.
+    options = ["--json", "--skip-git-repo-check", "-c", f"model={json.dumps(model)}", *codex_installed_skills()]
+    return [binary, "exec", *options, *(["resume", session] if session else []), prompt]
+
+
+def codex_attempt(cmd: list[str], cwd: pathlib.Path, out: IO[str]) -> str:
+    """Stream one session into out. Return "done", "timeout" or "exit <code>"."""
+    proc = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, encoding="utf-8")
+    timer = threading.Timer(CODEX_TIMEOUT, proc.kill)
+    timer.start()
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            out.write(line)
+            out.flush()
+        proc.wait()
+        if not timer.is_alive():
+            return "timeout"
+        return f"exit {proc.returncode}" if proc.returncode else "done"
+    finally:
+        timer.cancel()
+
+
+def codex_stats(lines: list[str]) -> tuple[str, str, dict[str, Any]]:
+    """The session, its final message and its counts, from `codex exec --json` events."""
+    session, result = "", ""
+    stats: dict[str, Any] = {"turns": 0, "commands": 0, "failed_commands": [], "mcp_calls": 0, "failed_mcp_calls": [],
+                             "web_searches": 0, "images_viewed": 0, "errors": [],
+                             "tokens": {"input": 0, "cached_input": 0, "output": 0, "reasoning": 0}}
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        kind = event.get("type")
+        item = event.get("item") or {}
+        if kind == "thread.started":
+            session = session or str(event.get("thread_id", ""))
+        elif kind == "turn.completed":
+            stats["turns"] += 1
+            usage = event.get("usage") or {}
+            for key, field in (("input", "input_tokens"), ("cached_input", "cached_input_tokens"),
+                               ("output", "output_tokens"), ("reasoning", "reasoning_output_tokens")):
+                stats["tokens"][key] += int(usage.get(field) or 0)
+        elif kind in ("turn.failed", "error"):
+            stats["errors"].append(event.get("error") or event.get("message") or event)
+        elif kind == "item.completed":
+            what = item.get("type")
+            if what == "agent_message":
+                result = item.get("text", "")
+            elif what == "command_execution":
+                stats["commands"] += 1
+                if item.get("exit_code"):
+                    stats["failed_commands"].append(str(item.get("command", ""))[:300])
+            elif what == "mcp_tool_call":
+                stats["mcp_calls"] += 1
+                if item.get("status") == "failed" or item.get("error"):
+                    stats["failed_mcp_calls"].append(f"{item.get('tool')}: {str(item.get('error'))[:300]}")
+            elif what == "web_search":
+                stats["web_searches"] += 1
+            elif "image" in str(what):
+                stats["images_viewed"] += 1
+    return session, result.strip(), stats
+
+
+def codex_run(folder: pathlib.Path, cmd: list[str], model: str, resume: bool = False) -> None:
+    """Run one session in Codex. A resumed session adds to the run's stream; a new run starts it again."""
+    cwd = folder / "cwd"
+    started = time.monotonic()
+    with open(folder / "out.jsonl", "a" if resume else "w", encoding="utf-8") as out:
+        outcome = codex_attempt(cmd, cwd, out)
+    session, result, stats = codex_stats((folder / "out.jsonl").read_text(encoding="utf-8").splitlines())
+    work = cwd / schedule.CODEX_WORK
+    stats.update({"agent": "codex", "model": model, "session": session, "outcome": outcome,
+                  "wall_minutes": round((time.monotonic() - started) / 60, 1),
+                  "work_folders_left": sorted(p.name for p in work.glob("graveyard-killer-*")) if work.exists() else []})
+    (folder / "result.txt").write_text(result, encoding="utf-8")
+    (folder / "session.txt").write_text(session, encoding="utf-8")
+    (folder / "stats.json").write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
+    tokens = stats["tokens"]
+    print(f"=== {folder.name} on {model} (session {session}): {outcome}, {stats['wall_minutes']} min, "
+          f"{stats['commands']} commands ({len(stats['failed_commands'])} failed), {stats['mcp_calls']} Notion calls "
+          f"({len(stats['failed_mcp_calls'])} failed), {tokens['input']} input and {tokens['output']} output tokens\n"
+          f"{result}\n", flush=True)
+
+
+# --- All -----------------------------------------------------------------------------------------
 
 def options(argv: list[str]) -> tuple[dict[str, str], list[str]]:
-    """Split the --agent, --model and --opencode-bin options from the positional arguments."""
-    found = {"agent": "claude", "model": "", "opencode-bin": os.environ.get("OPENCODE_BIN", "opencode")}
+    """Split the --agent, --model, --opencode-bin and --codex-bin options from the positional arguments."""
+    found = {"agent": "claude", "model": "", "opencode-bin": os.environ.get("OPENCODE_BIN", "opencode"),
+             "codex-bin": os.environ.get("CODEX_BIN", "")}
     rest: list[str] = []
     args = iter(argv)
     for arg in args:
@@ -391,8 +544,8 @@ def main() -> None:
     agent, model, binary = opts["agent"], opts["model"], opts["opencode-bin"]
     if len(args) < 3 or args[0] not in APPS or (args[1] in ("resume", "prompt") and len(args) != 4):
         sys.exit(__doc__)
-    if agent not in ("claude", "opencode"):
-        sys.exit(f"Unknown agent {agent!r}: use claude or opencode.")
+    if agent not in ("claude", "opencode", "codex"):
+        sys.exit(f"Unknown agent {agent!r}: use claude, opencode or codex.")
     app, kind = args[0], args[1]
     if kind == "drive" and app != "google-drive":
         sys.exit("drive.json runs against the Google Drive test Library only.")
@@ -400,13 +553,22 @@ def main() -> None:
         sys.exit("OpenCode runs against the Notion test Library only: the free route is Notion only (ADR-0007).")
     if agent == "opencode" and "/" not in model:
         sys.exit("OpenCode needs --model <provider/model>, such as opencode/glm-5.3-flash-free.")
+    if agent == "codex":
+        if app not in CODEX_APPS:
+            sys.exit("Codex runs against the Notion test Library only (ADR-0008).")
+        model = model or schedule.CODEX_MODEL
+        binary = codex_binary(opts["codex-bin"])
+        codex_check_home()
     local = load_local()
     library: str = local["libraries"][app]
     placeholders: dict[str, str] = local.get("placeholders", {})
     env = opencode_env() if agent == "opencode" else {}
 
     def start(name: str, memory: bool, prompt: str) -> pathlib.Path:
-        if agent == "opencode":
+        if agent == "codex":
+            folder = codex_prepare(model, app, name, library, memory)
+            codex_run(folder, codex_command(binary, model, prompt), model)
+        elif agent == "opencode":
             folder = opencode_prepare(model, app, name, library, memory)
             opencode_run(folder, opencode_command(binary, model, prompt), env, binary, model)
         else:
@@ -414,10 +576,14 @@ def main() -> None:
             run(folder, command(app, prompt), app)
         return folder
 
+    bases = {"claude": RUNS, "opencode": opencode_base(model) if agent == "opencode" else RUNS,
+             "codex": codex_base(model) if agent == "codex" else RUNS}
     if kind == "resume":
-        folder = (opencode_base(model) if agent == "opencode" else RUNS) / app / args[2]
+        folder = bases[agent] / app / args[2]
         session = (folder / "session.txt").read_text(encoding="utf-8").strip()
-        if agent == "opencode":
+        if agent == "codex":
+            codex_run(folder, codex_command(binary, model, args[3], session), model, resume=True)
+        elif agent == "opencode":
             opencode_run(folder, opencode_command(binary, model, args[3], session), env, binary, model, resume=True)
         else:
             run(folder, [*command(app, args[3]), "--resume", session], app, resume=True)
@@ -430,10 +596,9 @@ def main() -> None:
     for eval_id in map(int, args[2:]):
         spec = evals[eval_id]
         name = f"{kind}-{eval_id}"
-        base = opencode_base(model) if agent == "opencode" else RUNS
-        folder = base / app / name
+        folder = bases[agent] / app / name
         folder.mkdir(parents=True, exist_ok=True)
-        on = f" in OpenCode on {model}" if agent == "opencode" else ""
+        on = {"opencode": f" in OpenCode on {model}", "codex": f" in Codex on {model}"}.get(agent, "")
         lines = [f"# {kind} {eval_id} on {APPS[app]['name']}{on}", "", fill(spec["expected_output"], app, placeholders), ""]
         lines += [f"- {fill(x, app, placeholders)}" for x in spec["expectations"]]
         (folder / "expectations.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

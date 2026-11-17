@@ -72,6 +72,29 @@ The runner also keeps your own OpenCode setup out of the session:
 
 Runs land in `gk-evals/opencode/<model>/notion/<run>/`, with a `stats.json` that holds the minutes, the model steps, the tokens and the failed tool calls. A free model is slow, and each step sends the whole conversation again, starting at about 70,000 input tokens for the instructions, the tools and Notion's tool list.
 
+### On Codex
+
+Codex runs the Worker as a scheduled task in the ChatGPT desktop app ([ADR-0008](../docs/adr/0008-a-worker-in-codex.md)). The runner runs any eval in `codex exec` instead, against the Notion test Library only:
+
+```
+python3 evals/run_evals.py --agent codex notion worker 1 3 12
+python3 evals/run_evals.py --agent codex notion resume worker-12 "sì, sempre"
+```
+
+- **Before the first run,** sign Codex in to ChatGPT (the ChatGPT app does it), and to Notion once: `codex mcp add notion --url https://mcp.notion.com/mcp`. Both live in `~/.codex`, which the runner leaves as it is.
+- **The model** defaults to the scheduled task's, `gpt-6-luna`; `--model` names another.
+- **Codex** is `codex` on PATH, or else the one the ChatGPT app bundles on a Mac. `--codex-bin` or `CODEX_BIN` names another.
+
+Each eval runs in a fresh `codex exec --json`, in a run folder outside the repo written by `schedule.py codex`, as a user's is: `AGENTS.md` with the test pointer and the scripts line, `.codex/config.toml` and `.codex/rules`. This branch's skills go in the folder's own `.agents/skills`. Commands in the run can read only the skills and the folder, with no network, and only the skills' scripts, by full path, run outside the sandbox. If an eval fails on one of these rules, fix it in `schedule.py`, for users too.
+
+The runner also keeps your own setup out of the session:
+
+- A copy of the skills installed in `~/.agents/skills`, which Codex reads in every folder, is switched off for the run (`-c skills.config=[…]`).
+- It stops if `~/.codex/AGENTS.md` holds a Graveyard Killer pointer, which Setup on Codex writes there.
+- `~/.claude` stays out: Codex does not read `CLAUDE.md`, and the sandbox cannot read `~/.claude`.
+
+`schedule.py codex` marks each run folder as trusted in `~/.codex/config.toml`, one `[projects."…"]` table per eval name, since Codex ignores an untrusted folder's `.codex`. Runs land in `gk-evals/codex/<model>/notion/<run>/`, with a `stats.json` that holds the minutes, the commands and Notion calls with the failed ones, the tokens and the work folders left. `post.py`'s work folders go in the run folder's `work/`, not the system temp folder, so Worker eval 9 checks there (`work_folders_left`).
+
 ## Capture (`capture.json`)
 
 **Memory.** Every eval except 12 runs with the pointer in place. Keep the pointer out of the prompt: the skill reads the first link in the user's message, so a Library link in the prompt would be filed as the post. The runner runs eval 12 with no pointer.

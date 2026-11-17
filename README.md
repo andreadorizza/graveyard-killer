@@ -2,11 +2,11 @@
 
 Your saved posts are a graveyard. Graveyard Killer turns them into a Library in your own Notion or Google Drive. Share a post from your phone, and your computer later watches it, reads what it says and files it. When something you saved is worth doing this week, such as a concert date or a recipe for the weekend, Claude messages you with an offer, and does nothing until you say yes. It needs no server and no API keys.
 
-**Status: early release (0.9.0).** Tested with Claude on Android and on a Mac. A tester ran the Worker end to end on Windows 11 ([#1](https://github.com/andreadorizza/graveyard-killer/issues/1)). iPhone and Linux should work the same way but are untested. The Library lives in Notion or, new in 0.5.0, in Google Drive; saving to Drive from an iPhone is untested. New in 0.9.0, a [free route](#free-route-opencode) runs the daily run in OpenCode on a free model, tested on a Mac only. Codex support is being tested ([#3](https://github.com/andreadorizza/graveyard-killer/issues/3)).
+**Status: early release (0.9.0).** Tested with Claude on Android and on a Mac. A tester ran the Worker end to end on Windows 11 ([#1](https://github.com/andreadorizza/graveyard-killer/issues/1)). iPhone and Linux should work the same way but are untested. The Library lives in Notion or, new in 0.5.0, in Google Drive; saving to Drive from an iPhone is untested. New in 0.9.0, a [free route](#free-route-opencode) runs the daily run in OpenCode on a free model, and [Codex](#codex) runs it in the ChatGPT desktop app, on any ChatGPT plan; both are tested on a Mac only.
 
 ## What you need
 
-- A paid Claude plan (Pro or above). Plugins and the Code tab, where setup and the daily run happen, are not on the free plan. With no paid plan, use the [free route](#free-route-opencode).
+- A paid Claude plan (Pro or above). Plugins and the Code tab, where setup and the daily run happen, are not on the free plan. With no paid plan, use the [free route](#free-route-opencode), or [Codex](#codex) with a ChatGPT account.
 - Claude Desktop on your computer, and the Notion or Google Drive app on your phone.
 - For a Notion Library, Notion connected to Claude in *Customize → Connectors*. For a Google Drive Library, both Google Drive and Google Sheets, connected there.
 
@@ -45,6 +45,34 @@ What is different from the paid route:
 - **Free models are free "for a limited time"**, as OpenCode says. They also have a usage limit that OpenCode does not show: when a run hits it, it switches to the second model, GLM-5.3-Flash Free. When a model goes for good, you pick a new one.
 - **Updates**: tell OpenCode "update Graveyard Killer".
 - Untested: Windows, Linux, OpenCode's desktop app and OpenCode 2.x. The tests used OpenCode 1.19.5 in a terminal on a Mac. Capture and Recall in a free Claude chat are untested too.
+
+## Codex
+
+With a ChatGPT account, on any plan, Free included, the daily run happens in Codex, the coding agent in the ChatGPT desktop app. The app's own *Scheduled* view starts it every day, and there you see each run, change its time or run it now. It needs:
+
+- The ChatGPT desktop app, from [chatgpt.com/download](https://chatgpt.com/download/) for a Mac or Windows (Linux has a preview), signed in. OpenAI lists Codex on Free and Go "in the desktop app, subject to rollout".
+- A Notion Library. Google Drive is tested with Claude only.
+- Python 3 on your computer, as for the paid route.
+
+Then:
+
+1. In the ChatGPT app, open Codex, start a new chat and send:
+
+   ```
+   Install Graveyard Killer: follow https://raw.githubusercontent.com/andreadorizza/graveyard-killer/main/plugin/skills/graveyard-killer/references/codex.md#install
+   ```
+
+   It downloads the skills into `~/.agents/skills`, adds Notion and opens Notion in your browser to sign in. Codex asks you to approve each step.
+2. Start a new chat and type `Set up Graveyard Killer`. Setup works as on the paid route, and creates a scheduled task that runs in the `graveyard-killer` folder in your home folder.
+
+What is different from the paid route:
+
+- **Your data and OpenAI.** On ChatGPT's personal plans, OpenAI may use your chats, Codex's included, to train its models unless you turn off *Improve the model for everyone* in *Settings → Data controls*. Setup asks you to turn it off, since your saved posts and Library go through those chats.
+- **A fenced run.** The scheduled task starts the run with one command, and the run itself happens in the run folder, under Codex's own settings for that folder: its commands can read only the skills and that folder and cannot reach the internet, and only Graveyard Killer's own scripts can download and transcribe. The app would otherwise run a task with your usual Codex permissions, which can read your whole disk.
+- **The run happens only while the ChatGPT app is running** and the computer is awake.
+- **Pings** come as a notification on your computer, or not at all. The whole message waits in the run's chat, under *Scheduled* in the app.
+- **Updates**: tell Codex "update Graveyard Killer".
+- Untested: Windows, Linux, and plans other than Free. The tests used the ChatGPT app 26.1111 on a Mac, on a Free account, with GPT-6 Luna.
 
 ## How it works
 

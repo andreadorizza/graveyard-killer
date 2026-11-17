@@ -123,7 +123,7 @@ def test_read_reports_a_blocked_tool_by_name(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(subprocess, "run", refusing({"yt-dlp"}, []))
 
     result = post.read("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    post.clean(Path(result["work"]))
+    assert result["work"] is None  # a failed read removes its own work folder
 
     assert result["status"] == "error"
     assert result["reason"].startswith("Windows Smart App Control blocked yt-dlp")
@@ -142,7 +142,7 @@ def test_a_403_still_retries_when_uv_is_blocked(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(subprocess, "run", forbidden)
 
     result = post.read("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    post.clean(Path(result["work"]))
+    assert result["work"] is None  # a failed read removes its own work folder
 
     assert [command[0] for command in calls] == ["yt-dlp", "uv", "yt-dlp"]
     assert "403" in result["reason"]

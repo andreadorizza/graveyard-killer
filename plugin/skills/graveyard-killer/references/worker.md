@@ -40,7 +40,7 @@ When the user answers in this chat, later or at once, act as [ping.md](ping.md#w
 A shared save came in through the Library app's share route, or the user added it by hand, with no agent. Do these steps for each one. Done when each is an Inbox Entry, a merged duplicate, or set aside.
 
 1. **Find the link** in the places [List the shared saves](library.md#list-the-shared-saves) gives, in that order. With no link anywhere, [set it aside](library.md#set-a-shared-save-aside): it is not a post.
-2. **Clean it** with the link script, passing the link through a quoted heredoc: `python3 scripts/link.py <<'MESSAGE'`, the link, then `MESSAGE`. An `{"error": "no link"}` result: [set it aside](library.md#set-a-shared-save-aside). An `{"unsupported": "story"}` result: [adopt it](library.md#adopt-a-shared-save) with Status set to the Library's label for Unavailable and a Note saying that Stories cannot be kept, and stop.
+2. **Clean it** with the link script, passing the link through a quoted heredoc: `python3 scripts/link.py <<'MESSAGE'`, the link, then `MESSAGE`. In Codex, give it as an argument instead ([codex.md](codex.md#run-the-scripts)). An `{"error": "no link"}` result: [set it aside](library.md#set-a-shared-save-aside). An `{"unsupported": "story"}` result: [adopt it](library.md#adopt-a-shared-save) with Status set to the Library's label for Unavailable and a Note saying that Stories cannot be kept, and stop.
 3. **Fill the fields:** [adopt it](library.md#adopt-a-shared-save) with Link set to the cleaned link, Platform from the script, Status Inbox, Captured with the day it was shared, the fallback Category, and the Title "⏳ <Platform> post" in the Settings language. When the text it was shared with was more than the link, move that text to the start of the long text as "Shared as: <text>", in the Settings language.
 4. **Check for a duplicate** by the cleaned link ([Find an Entry by its link](library.md#find-an-entry-by-its-link)), leaving out this one. If another Entry has it, the other Entry stays: add "Captured again on <this one's Captured date>" to the end of its long text, and set this one's Note to "Duplicate of <[link to the other Entry](library.md#link-to-an-entry)>". The Ping asks before it is removed.
 
@@ -62,7 +62,7 @@ An article or any other page has no media to read. If its Summary is empty, read
    LINK
    ```
 
-   When the Entry's Caption is clearly in one language, add its language code as a hint, such as `read --language it <<'LINK'`, so that the right speech engine runs. Done when the script has printed one JSON object. Keep its `work` path for step 4.
+   When the Entry's Caption is clearly in one language, add its language code as a hint, such as `read --language it <<'LINK'`, so that the right speech engine runs. In Codex, give the link as an argument instead, as [codex.md](codex.md#run-the-scripts) says. Done when the script has printed one JSON object. Keep its `work` path for step 4.
 
 3. **Act on its `status`.** Done when the Entry has its result:
    - `ok`: if its `link` differs from the Entry's Link, [merge a duplicate](#merge-a-duplicate) first. Otherwise, [finish the Entry](#finish-the-entry).

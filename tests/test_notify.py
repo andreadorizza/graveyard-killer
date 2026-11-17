@@ -38,6 +38,14 @@ def test_notify_shows_the_title_and_line_unexpanded(post: Callable[..., Run]) ->
         assert call["argv"][-2:] == [TITLE, MESSAGE]
 
 
+def test_notify_takes_the_title_and_line_as_arguments_too(post: Callable[..., Run]) -> None:
+    run = post("notify", TITLE, MESSAGE, scenario=ALL_NOTIFIERS_WORK)
+    assert run.output == {"notified": True}
+    [call] = notifier_calls(run)
+    text = call["env"]["GK_NOTIFY_MESSAGE"] if platform.system() == "Windows" else call["argv"][-1]
+    assert text == MESSAGE
+
+
 def test_notify_needs_a_title_and_a_message(post: Callable[..., Run]) -> None:
     run = post("notify", stdin="Graveyard Killer\n", scenario=ALL_NOTIFIERS_WORK)
     assert run.exit_code == 2

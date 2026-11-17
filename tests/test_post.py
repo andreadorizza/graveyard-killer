@@ -306,13 +306,15 @@ def test_without_a_thumbnail_the_first_keyframe_stands_in(
         "ERROR: [TikTok] 7400000000000000001: Unable to download webpage: HTTP Error 404: Not Found",
     ],
 )
-def test_a_removed_private_or_missing_post_is_unavailable(post: Callable[..., Run], error: str) -> None:
+def test_a_removed_private_or_missing_post_is_unavailable(post: Callable[..., Run], error: str, tmp_path: Path) -> None:
     run = post("read", VIDEO, scenario={"yt-dlp": [{"exit": 1, "stderr": error}]})
 
     assert run.output["status"] == "unavailable"
     assert run.output["reason"]
     assert run.output["link"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    assert Path(run.output["work"]).is_dir()
+    # Nothing in it is of use: the read removes its own work folder, so a run has nothing to clean.
+    assert run.output["work"] is None
+    assert not list((tmp_path / "temp").glob("graveyard-killer-*"))
 
 
 @pytest.mark.parametrize(
@@ -400,7 +402,7 @@ def test_a_tool_that_hangs_is_stopped_with_an_error(post: Callable[..., Run]) ->
     assert time.monotonic() - started < 9
     assert run.output["status"] == "error"
     assert "yt-dlp" in run.output["reason"] and "stopped" in run.output["reason"]
-    assert Path(run.output["work"]).is_dir()
+    assert run.output["work"] is None
 
 
 CAROUSEL = "https://www.instagram.com/p/DAbc123xyz/?img_index=1"

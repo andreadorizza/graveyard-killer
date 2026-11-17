@@ -39,7 +39,7 @@ Done when you hold the three parts below, each of them possibly empty.
    - the Digest, when due, with its Library Proposals and their numbers. Leave out its duplicates offer, which the fixes cover.
 4. **Alert the user** through "Ping by" in the Settings' Pings section. Skip the alert when the run was not scheduled: the user is already in this chat. Done when the alert is sent, or failed and you noted why.
    - **email:** an email to the user's own address through their Gmail connector. Its subject is "Graveyard Killer: " and the most urgent item, such as "Graveyard Killer: the Roma concert is on Saturday". Its body is the whole Ping, then one line saying that they can answer from any Claude chat, on the phone too, by naming Graveyard Killer, such as "Graveyard Killer, yes to 1".
-   - **push:** your push notification tool, `PushNotification` in Claude Desktop, with one short line about the most urgent item. From a scheduled run it reaches only this computer, since scheduled runs have no Remote Control, and it skips the alert while the user is active there. With no push tool, as in OpenCode, show that line as a notification on this computer, with "Graveyard Killer" on the first line of stdin and your line on the second:
+   - **push:** your push notification tool, `PushNotification` in Claude Desktop, with one short line about the most urgent item. From a scheduled run it reaches only this computer, since scheduled runs have no Remote Control, and it skips the alert while the user is active there. With no push tool, as in OpenCode and Codex, show that line as a notification on this computer, with "Graveyard Killer" on the first line of stdin and your line on the second:
 
      ```
      python3 scripts/post.py notify <<'ALERT'
@@ -48,7 +48,7 @@ Done when you hold the three parts below, each of them possibly empty.
      ALERT
      ```
 
-     `"notified": false` means it did not show: put its reason in the Ping's fixes.
+     In Codex, give the two lines as arguments instead ([codex.md](codex.md#run-the-scripts)). `"notified": false` means it did not show: put its reason in the Ping's fixes.
    - **none**, or empty: no alert. The chat waits in the app's list of runs.
 5. **End the run with the Ping** as your final message. Done when it is written.
 
