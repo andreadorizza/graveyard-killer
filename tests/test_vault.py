@@ -667,7 +667,10 @@ def test_a_link_inside_the_vault_to_a_file_outside_is_refused(library: Path, tmp
     assert outside.read_text(encoding="utf-8") == "keep me\n"
 
 
-def test_out_is_only_a_new_jsonl_file(library: Path, tmp_path: Path) -> None:
+def test_out_is_only_a_new_jsonl_file_in_a_temporary_folder(library: Path, tmp_path: Path) -> None:
+    home = Path.home() / f".gk-test-{os.getpid()}.jsonl"
+    vault("list", library / "Entries", "--out", home, ok=False)
+    assert not home.exists()
     taken = tmp_path / "taken.jsonl"
     taken.write_text("keep me\n", encoding="utf-8")
 

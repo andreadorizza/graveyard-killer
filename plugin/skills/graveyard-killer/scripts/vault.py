@@ -35,7 +35,8 @@ Every other command prints one JSON value. An error prints {"error": "..."} and 
 
 Paths are absolute; a leading ~ is the home folder. The notes, folders and files a command
 reads or writes must be inside an Obsidian vault, outside its dot folders such as .obsidian
-and .trash, and are only .md notes, a .base file or images. --out makes only a new .jsonl file.
+and .trash, and are only .md notes, a .base file or images. --out makes only a new .jsonl file in a
+temporary folder, such as the agent's scratchpad.
 
 The JSON goes in a file, written by the agent's own file tool, never in the command:
 Claude Code holds back a shell command whose text has a brace beside a quote, and text
@@ -582,10 +583,11 @@ def holds(properties: Properties, where: tuple[str, str, str]) -> bool:
 def print_lines(items: list[dict[str, Any]], out: str | None) -> None:
     lines = [json.dumps(item, ensure_ascii=False) for item in items]
     if out:
-        # Outside the vault, so only a new .jsonl file in a folder that exists: never one that is there.
-        target = path_arg(out)
-        if target.suffix != ".jsonl" or not target.parent.is_dir():
-            fail(f"--out is a new .jsonl file in a folder that exists: {out}")
+        # Outside the vault, so only a new .jsonl file in a temporary folder, such as the agent's scratchpad.
+        target = path_arg(out).resolve()
+        temporary = {Path(tempfile.gettempdir()).resolve(), Path("/tmp").resolve()}
+        if target.suffix != ".jsonl" or not target.parent.is_dir() or not any(target.is_relative_to(t) for t in temporary):
+            fail(f"--out is a new .jsonl file in a temporary folder, such as your scratchpad: {out}")
         write_new(target, "".join(f"{line}\n" for line in lines))
         print(json.dumps({"count": len(lines), "out": str(target)}))
         return
