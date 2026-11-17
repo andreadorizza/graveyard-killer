@@ -47,7 +47,7 @@ You have chosen Capture, found the Library and read its Settings (see SKILL.md).
    - Use the fallback Category.
    - Set the Note to say that only the link was saved and the tidy-up will fill in the rest.
 
-5. **[Create the Entry](library.md#create-an-entry).** Use the Library's field names and its label for Status Inbox, and write text as [library.md](library.md#writing-to-the-library) and your Library app's file explain. Done when the connector confirms the new Entry. Its fields are:
+5. **[Create the Entry](library.md#create-an-entry).** Use the Library's field names and its label for Status Inbox, and write text as [library.md](library.md#writing-to-the-library) and your Library app's file explain. Done when the Library app confirms the new Entry. Its fields are:
    - Title, Summary, Next action, Category, Category fields and Tags: from step 4
    - Link: the canonical `link`
    - Platform: Instagram, TikTok, YouTube or Other, the label for the script's `platform`

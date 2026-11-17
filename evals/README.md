@@ -3,22 +3,22 @@
 Evals for the `graveyard-killer` and `graveyard-killer-worker` skills, in [skill-creator](https://github.com/anthropics/skills)'s `evals.json` format. They live outside `plugin/`, so they are not installed with the plugin.
 
 - `capture.json` and `worker.json` run once per Library app, against a test Library in that app.
-- `drive.json` holds the evals for a Google Drive Library alone.
+- `drive.json` holds the evals for a Google Drive Library alone, and `obsidian.json` those for an Obsidian Library alone.
 
 ## Library apps
 
-Every eval runs against a test Library that exists only for evals, never the user's own. Build one per app with Setup's step 2, as [setup-notion.md](../plugin/skills/graveyard-killer/references/setup-notion.md) and [setup-google-drive.md](../plugin/skills/graveyard-killer/references/setup-google-drive.md) say, in a "Development" page or folder.
+Every eval runs against a test Library that exists only for evals, never the user's own. Build one per app with Setup's step 2, as [setup-notion.md](../plugin/skills/graveyard-killer/references/setup-notion.md), [setup-google-drive.md](../plugin/skills/graveyard-killer/references/setup-google-drive.md) and [setup-obsidian.md](../plugin/skills/graveyard-killer/references/setup-obsidian.md) say, in a "Development" page or folder. For Obsidian, the test vault is a folder outside the repo with an empty `.obsidian` folder in it, so that `vault.py` sees a vault; Obsidian itself need not be installed.
 
-**The Library-app placeholder.** `{{LIBRARY_APP}}` in an eval stands for the app of the test Library the run uses: Notion or Google Drive. Grade each eval with that app's file: "long text" is the page body on Notion and the Captures, Transcript and On-screen text columns on Drive, and "removed" is the trash on Notion and a deleted row on Drive.
+**The Library-app placeholder.** `{{LIBRARY_APP}}` in an eval stands for the app of the test Library the run uses: Notion, Google Drive or Obsidian. Grade each eval with that app's file: "long text" is the page body on Notion, the Captures, Transcript and On-screen text columns on Drive, and the note's body on Obsidian; "removed" is the trash on Notion, a deleted row on Drive, and the vault's `.trash` folder on Obsidian. On Obsidian, an eval about phone chats or the pointer in the Instructions does not apply.
 
 ## Running them
 
 `run_evals.py` runs each eval in a fresh headless `claude -p` session, with the plugin loaded from this repo, in a folder outside the repo whose `CLAUDE.md` holds only the test Library's pointer. It keeps your own `~/.claude/CLAUDE.md`, which may point to your real Library, out of the session, and denies reading anything under `~/.claude`: an agent that finds no pointer searches for one, and on 2026-11-13 eval 12 found the real pointer that way and filed into the real Library. It allows only the connectors of the app under test, and only the skill's own scripts.
 
 ```
-python3 evals/run_evals.py <notion|google-drive> <capture|worker|drive> <id> [<id> ...]
-python3 evals/run_evals.py <notion|google-drive> resume <run> "<reply>"
-python3 evals/run_evals.py <notion|google-drive> prompt <run> "<message>"
+python3 evals/run_evals.py <notion|google-drive|obsidian> <capture|worker|drive|obsidian> <id> [<id> ...]
+python3 evals/run_evals.py <notion|google-drive|obsidian> resume <run> "<reply>"
+python3 evals/run_evals.py <notion|google-drive|obsidian> prompt <run> "<message>"
 ```
 
 `resume` answers a run in its own session, such as "sì" to a Ping. `prompt` sends any message with the test Library's pointer in place. Each run leaves its stream, its final message and the expectations to grade in `gk-evals/<app>/<run>/` in the system temp folder. Grade by reading the test Library.
@@ -29,7 +29,8 @@ It reads `evals/local.json`, which is not committed:
 {
   "libraries": {
     "notion": "<the Notion test Library's link>",
-    "google-drive": "<the Drive test Library's Sheet link>"
+    "google-drive": "<the Drive test Library's Sheet link>",
+    "obsidian": "<the Obsidian test Library folder's absolute path>"
   },
   "placeholders": {
     "{{INSTAGRAM_REEL_URL}}": "https://www.instagram.com/reel/<code>/",
@@ -71,5 +72,9 @@ The Worker downloads and transcribes, so the tools from `post.py check` must be 
 ## Google Drive alone (`drive.json`)
 
 These run only against the Drive test Library. Each `expected_output` gives its seed: write rows with the Sheets connector's `update_spreadsheet` (`appendCells`, text as `stringValue`), and put shared files in "Share here" with the Drive connector.
+
+## Obsidian alone (`obsidian.json`)
+
+These run only against the Obsidian test Library. Each `expected_output` gives its seed: write notes and the Share here note's text with `vault.py`, or by hand where the eval says so. Grade by reading the files, and check each note's frontmatter with a YAML parser too.
 
 The post script itself is tested in `tests/test_post.py` with fake tools and no network, and in `tests/test_post_live.py` against the real tools (`uv run pytest -m live`).

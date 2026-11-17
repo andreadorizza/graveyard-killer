@@ -21,6 +21,10 @@ This page records v1. Version 0.4.0 changes it after the launch feedback; where 
 - **Google Drive** is the second Library app: one Sheet with an Entries tab and a Settings tab, and the folders "Share here" and "Already read" ([ADR-0005](adr/0005-a-library-in-more-than-one-app.md)). Setup asks which app, recommending Notion.
 - **A shared save with no link** is set aside. On Drive it moves to "Already read" and the next Ping names it; on Notion it stays where it is.
 
+## Changed in 0.9.0
+
+- **Obsidian** is the third Library app: a folder in the user's vault, with one note per Entry, a `Settings` note, a "Share here" note the phone appends to, and a Base for the table and the cards ([ADR-0007](adr/0007-a-library-in-obsidian.md)). Agents reach it only through `scripts/vault.py`, on the computer. So for these users, Recall and answering a Ping happen in the Code tab only.
+
 ## Parts
 
 - **Plugin.** A Claude plugin marketplace with one plugin. Inside it is a standard Agent Skill: `SKILL.md` plus Python scripts. Both scripts, Capture's link script and the Worker's post script, use only the Python standard library and run with `python3`, so the link script also runs in a phone app's sandbox. The tools the post script calls (yt-dlp, gallery-dl, Whisper) are installed with uv. Everything is written in English, and the agent talks in the user's language.

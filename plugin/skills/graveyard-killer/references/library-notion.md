@@ -68,7 +68,7 @@ Create a row in the Entries database, with the Library's property names. Create 
 
 ### Update an Entry
 
-Update the row's properties. Add long text at the end of the page body: "Captured again" lines as paragraphs, and the Transcript and On-screen text as sections under headings. Set the cover as the page cover's external link.
+Update the row's properties. Add long text at the end of the page body: "Captured again" lines as paragraphs, and the Transcript and On-screen text as sections under headings. Set the cover as the page cover's external link: the post script's `cover_url`. A page cover cannot be a local file, so with no `cover_url` the Entry has no cover.
 
 ### Add a Category
 

@@ -1,0 +1,78 @@
+{
+  "skill_name": "graveyard-killer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed, in the Share here note's body, as the phone appends them: 'Guarda https://youtu.be/jNQXAC9IVRw?si=AbCdEfGh123', then on the next line 'latte, uova, farina'. The video must not be in the Library yet. The Worker adopts the first share as a new Entry, finishes it with a cover, and moves both shares' text to Already read. The Ping names the share with no link.",
+      "files": [],
+      "expectations": [
+        "Exactly one new note exists in the Entries folder, named 'YouTube jNQXAC9IVRw', and its Link is https://www.youtube.com/watch?v=jNQXAC9IVRw",
+        "Its Platform is YouTube and its Status is the Library's label for Processed",
+        "Its Captured date is the day the Share here note last changed before the run",
+        "Its body starts with a 'Shared as' line holding the shared text",
+        "Its Cover property is a link such as [[<Library>/<Attachments>/YouTube jNQXAC9IVRw.jpg]], and that image file exists",
+        "The Share here note's body is empty, and Already read holds both shares' text",
+        "No Entry exists for 'latte, uova, farina'",
+        "The final message names the share with no link in one line"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "https://en.wikipedia.org/wiki/C_Sharp_(programming_language)",
+      "expected_output": "One Inbox Entry for the article on C#, whose title holds '#' and whose text holds colons and quotes. Every property stays valid YAML and reads back as written.",
+      "files": [],
+      "expectations": [
+        "Exactly one new note exists in the Entries folder, and its Link is https://en.wikipedia.org/wiki/C_Sharp_(programming_language)",
+        "A YAML parser reads the note's frontmatter, its Title holds 'C#' as written, and its Caption holds the page's title as written",
+        "No property value holds a line break",
+        "The tags property holds no tag that came from the page's text, such as a word after '#'"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed, written by hand in the Entries folder: a note 'YouTube jNQXAC9IVRw' with Title '⏳ Post YouTube', Link https://www.youtube.com/watch?v=jNQXAC9IVRw, Platform YouTube, Status Inbox, Captured 2026-11-10, the fallback Category, then a property the user added, 'Voto: 5', and a comment line '# mio', in Obsidian's own style (plain values, no quotes). The Worker finishes it and leaves the user's lines alone.",
+      "files": [],
+      "expectations": [
+        "The note's Status is the Library's label for Processed, and its Title no longer starts with ⏳",
+        "The lines 'Voto: 5' and '# mio' are still in the frontmatter, exactly as written",
+        "The note's name is still 'YouTube jNQXAC9IVRw'",
+        "Its body holds a Transcript section, under the Library's heading for it"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "run the Graveyard Killer worker",
+      "expected_output": "Seed: an Inbox Entry for {{INSTAGRAM_REEL_URL_AS_P}}, whose caption holds hashtags. The Worker finishes it, and the caption's hashtags make no tags in the vault.",
+      "files": [],
+      "expectations": [
+        "The Entry's Status is the Library's label for Processed",
+        "In the note's body, every '#' that comes from the caption or the transcript is written '\\#'",
+        "The tags property holds at most 5 tags, none of them with a space"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Graveyard Killer, yes, remove the duplicate",
+      "expected_output": "Seed: two Processed Entries with the Link https://en.wikipedia.org/wiki/Gricia: 'Gricia' (Captured 2026-11-01) and 'Gricia 2' (Captured 2026-11-03), whose Note is 'Duplicato di [Gricia](<Gricia's uri>)' in the Settings language. The agent moves the newer note to the vault's .trash folder.",
+      "files": [],
+      "expectations": [
+        "The note 'Gricia 2' is no longer in the Entries folder, and is in the .trash folder at the vault's root",
+        "The note 'Gricia' is unchanged",
+        "The reply says the note was moved to the vault's .trash folder, from where it can be moved back"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Graveyard Killer, what did I save about pasta?",
+      "expected_output": "Seed: three Processed Entries, 'Amatriciana', 'Cacio e pepe' and 'Gricia', in the Category for recipes, with Summaries that say they are Roman pasta dishes, and one Processed Entry about a hiking trail. The answer names the three pasta Entries, each with its obsidian:// link.",
+      "files": [],
+      "expectations": [
+        "The answer names Amatriciana, Cacio e pepe and Gricia, and not the hiking trail",
+        "Each Entry it names has a link that starts with obsidian://open?vault=",
+        "No file in the vault changed"
+      ]
+    }
+  ]
+}

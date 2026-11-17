@@ -1,11 +1,11 @@
 """Run the Graveyard Killer evals headless, one fresh `claude -p` session each.
 
 Usage:
-    python3 evals/run_evals.py <app> <capture|worker|drive> <id> [<id> ...]
+    python3 evals/run_evals.py <app> <capture|worker|drive|obsidian> <id> [<id> ...]
     python3 evals/run_evals.py <app> resume <run> "<reply>"
     python3 evals/run_evals.py <app> prompt <run> "<prompt>"
 
-<app> is `notion` or `google-drive`. `resume` answers a finished run in its own
+<app> is `notion`, `google-drive` or `obsidian`. `resume` answers a finished run in its own
 session. `prompt` runs any message against the test Library, for example to seed it.
 
 Each run writes <temp folder>/gk-evals/<app>/<run>/: out.jsonl (the session's stream),
@@ -37,6 +37,8 @@ APPS: dict[str, dict[str, Any]] = {
         "tools": ["mcp__claude_ai_Google_Drive", "mcp__claude_ai_Google_Sheets"],
         "servers": ["claude.ai Google Drive", "claude.ai Google Sheets"],
     },
+    # A folder in a test vault: no connector, only the skill's vault script.
+    "obsidian": {"name": "Obsidian", "tools": [], "servers": []},
 }
 # A session whose app connectors are still pending, or missing, when it starts fails to reach the Library
 # (seen on 2026-11-13). The runner stops such a session at once and starts it again, this many times in all.
@@ -48,8 +50,8 @@ SETTINGS = json.dumps(
 # Posts are untrusted input, so the sessions may run the skill's own scripts only, not any python3.
 SCRIPTS = REPO / "plugin" / "skills" / "graveyard-killer" / "scripts"
 ALLOWED = ["Skill", "ToolSearch", "Read", "Glob", "Grep", "WebFetch", "Bash(sleep:*)", "Bash(ls:*)",
-           *(f"Bash(python3 {path}:*)" for name in ("link.py", "post.py", "graveyard.py")
-             for path in (f"scripts/{name}", str(SCRIPTS / name)))]
+           *(f"Bash(python3 {path}:*)" for name in ("link.py", "post.py", "graveyard.py", "vault.py")
+             for path in (f"scripts/{name}", str(SCRIPTS / name), f'"{SCRIPTS / name}"'))]
 # ~/.claude holds the user's own CLAUDE.md, with the pointer to their real Library. claudeMdExcludes keeps
 # it out of the context, but an agent that finds no pointer will search for one, so it must not read there.
 DISALLOWED = ["mcp__claude_ai_Gmail", "mcp__claude_ai_Google_Calendar", "PushNotification", "Write", "Edit",
@@ -74,6 +76,10 @@ def fill(text: str, app: str, placeholders: dict[str, str]) -> str:
 def command(app: str, prompt: str) -> list[str]:
     allowed = [*ALLOWED, *APPS[app]["tools"]]
     disallowed = [*DISALLOWED, *(t for other, spec in APPS.items() if other != app for t in spec["tools"])]
+    if app == "obsidian":
+        # vault.py takes its JSON from a file the agent writes in its scratchpad. A write anywhere else,
+        # such as into the vault, still needs an approval that a headless session never gets.
+        disallowed.remove("Write")
     return ["claude", "-p", prompt, "--plugin-dir", str(REPO / "plugin"), "--settings", SETTINGS,
             "--output-format", "stream-json", "--verbose",
             "--allowedTools", *allowed, "--disallowedTools", *disallowed]
@@ -156,6 +162,8 @@ def main() -> None:
     app, kind = sys.argv[1], sys.argv[2]
     if kind == "drive" and app != "google-drive":
         sys.exit("drive.json runs against the Google Drive test Library only.")
+    if kind == "obsidian" and app != "obsidian":
+        sys.exit("obsidian.json runs against the Obsidian test Library only.")
     local = load_local()
     library: str = local["libraries"][app]
     placeholders: dict[str, str] = local.get("placeholders", {})

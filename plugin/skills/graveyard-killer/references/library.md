@@ -10,8 +10,11 @@ A Library lives in one **Library app**. The host of the link in the pointer line
 | --- | --- | --- |
 | A host that is, or ends in, `notion.so`, `notion.com` or `notion.site`, such as `app.notion.com` or `www.notion.so` | Notion | [library-notion.md](library-notion.md) |
 | A Google Sheet: the host `docs.google.com`, with a path that starts with `/spreadsheets/` | Google Drive | [library-google-drive.md](library-google-drive.md) |
+| An absolute path to a folder on the computer, such as `/Users/ana/Obsidian/Notes/Graveyard Killer`, `~/Obsidian/Graveyard Killer` or `C:\Users\Ana\Obsidian\Graveyard Killer` | Obsidian | [library-obsidian.md](library-obsidian.md) |
 
 Read your Library app's file before the first operation of a job, and follow it for every operation below. Never read another app's file: it does not apply. If the link matches no row above, it is not a Library link: tell the user so in one line, and stop.
+
+Most Library apps are reached through connectors, from any chat. A Library in a folder on the computer is reached only from that computer: its app's file says what to tell the user anywhere else.
 
 A Library holds:
 

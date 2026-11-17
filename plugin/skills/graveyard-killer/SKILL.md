@@ -5,7 +5,7 @@ description: Capture a shared post into the user's Graveyard Killer Library, and
 
 # Graveyard Killer
 
-Graveyard Killer files the posts a user sends you into their own **Library**, which lives in an app they own, Notion or Google Drive: their **Library app**. Each post becomes one **Entry**. You do the work through the user's own connectors: there is no server and no API key.
+Graveyard Killer files the posts a user sends you into their own **Library**, which lives in an app they own, Notion, Google Drive or Obsidian: their **Library app**. Each post becomes one **Entry**. You do the work through the user's own connectors: there is no server and no API key.
 
 The scripts in this skill run with `python3`. On Windows, `python3` can be the Microsoft Store's placeholder, which prints "Python was not found" and exits with code 49. Then use `py -3` in its place for every script.
 
@@ -47,7 +47,7 @@ Done when you know the job:
 
 Look in your instructions and memory for the Library's location, one line: `Graveyard Killer Library: <link>`. Done when you hold the Library link.
 
-- If the line is missing, ask the user once for the link to their Graveyard Killer Library, such as its Notion page's or Google Sheet's link. If they have no Library yet: on a computer, offer Setup ([references/setup.md](references/setup.md)); on a phone, tell them Setup runs on their computer, in the Claude Desktop Code tab, and stop.
+- If the line is missing, ask the user once for the link to their Graveyard Killer Library, such as its Notion page's or Google Sheet's link, or its Obsidian folder's path. If they have no Library yet: on a computer, offer Setup ([references/setup.md](references/setup.md)); on a phone, tell them Setup runs on their computer, in the Claude Desktop Code tab, and stop.
 - When you had to ask for the link, give the user the pointer text from [setup.md](references/setup.md#the-pointer) once, ready to paste into the Instructions in their Claude settings, so that you need not ask again.
 
 ## 3. Read the Settings
@@ -56,4 +56,4 @@ Read [references/library.md](references/library.md), then the file of the Librar
 
 Then compare the Settings' Version with [references/upgrade.md](references/upgrade.md). When the Library is older or newer than this skill, or has no Version, follow upgrade.md: a Worker run, or Setup for a Library made elsewhere, brings an older Library up to date first, and every other job only reads it as upgrade.md describes. Done when you know which.
 
-If the Library or its Settings cannot be read, tell the user which one failed and that their connector for the Library app, such as Notion's or Google Sheets', may need reconnecting, and stop.
+If the Library or its Settings cannot be read, tell the user which one failed and that their connector for the Library app, such as Notion's or Google Sheets', may need reconnecting, or, for a Library in a folder on the computer, that the folder may have moved. Then stop.

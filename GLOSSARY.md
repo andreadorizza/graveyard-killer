@@ -45,7 +45,7 @@ The one place that holds every Entry and the Settings, in the user's Library app
 _Avoid_: Database, archive, collection
 
 **Library app**:
-The app the Library lives in, such as Notion or Google Drive. A Library lives in exactly one.
+The app the Library lives in, such as Notion, Google Drive or Obsidian. A Library lives in exactly one.
 _Avoid_: Backend, provider, host, store
 
 **Entry**:

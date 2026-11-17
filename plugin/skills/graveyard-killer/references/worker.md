@@ -41,7 +41,9 @@ A shared save came in through the Library app's share route, or the user added i
 
 1. **Find the link** in the places [List the shared saves](library.md#list-the-shared-saves) gives, in that order. With no link anywhere, [set it aside](library.md#set-a-shared-save-aside): it is not a post.
 2. **Clean it** with the link script, passing the link through a quoted heredoc: `python3 scripts/link.py <<'MESSAGE'`, the link, then `MESSAGE`. An `{"error": "no link"}` result: [set it aside](library.md#set-a-shared-save-aside). An `{"unsupported": "story"}` result: [adopt it](library.md#adopt-a-shared-save) with Status set to the Library's label for Unavailable and a Note saying that Stories cannot be kept, and stop.
-3. **Fill the fields:** [adopt it](library.md#adopt-a-shared-save) with Link set to the cleaned link, Platform from the script, Status Inbox, Captured with the day it was shared, the fallback Category, and the Title "⏳ <Platform> post" in the Settings language. When the text it was shared with was more than the link, move that text to the start of the long text as "Shared as: <text>", in the Settings language.
+3. **Fill the fields:** [adopt it](library.md#adopt-a-shared-save) with Link set to the cleaned link, Platform from the script, Status Inbox, Captured with the day it was shared, the fallback Category, and the Title "⏳ <Platform> post" in the Settings language. When the text it was shared with was more than the link:
+   - Text on the lines before the link's line is the post's caption, as Instagram shares a reel with its caption and then its link: set Caption to it, without the link, as your Library app's file says for a caption of more than one line. Finishing the Entry replaces it with the post's own caption.
+   - Other text, such as an app's share text on the link's own line, goes at the start of the long text as "Shared as: <text>", in the Settings language.
 4. **Check for a duplicate** by the cleaned link ([Find an Entry by its link](library.md#find-an-entry-by-its-link)), leaving out this one. If another Entry has it, the other Entry stays: add "Captured again on <this one's Captured date>" to the end of its long text, and set this one's Note to "Duplicate of <[link to the other Entry](library.md#link-to-an-entry)>". The Ping asks before it is removed.
 
 ## Each Entry
@@ -102,7 +104,7 @@ Read the `caption` and the `transcript`. Look at every image in `keyframes` with
 - Tags, at most 5 on the Entry. Before using a new Tag, [add it](library.md#add-a-tag);
 - Author and Caption from `author` and `caption`, word for word: never shorten, reword or translate the caption. Apply the song-lyrics rule from [library.md](library.md#writing-to-the-library) and your Library app's rule for long text;
 - at the end of the long text, after any lines already there, a Transcript section with one paragraph per item in `transcript_blocks`, word for word in the language spoken, and an On-screen text section with what the keyframes show, leaving out a section that would be empty. When the video has no speech, only music or singing, the transcript is song lyrics or noise: leave the Transcript section out and say in the Summary that the video has only music;
-- the cover, when `cover_url` is not null and the Library app shows covers. With no `cover_url`, the Entry has no cover.
+- the cover, when the Library app shows covers, from `cover_url` or the `thumbnail` file, as your Library app's file says. Set it before step 4's clean-up, which deletes the `thumbnail`.
 
 Done when every write has succeeded. Then set Status to the Library's label for Processed, set Processed to today, and clear the Note. If any write failed, leave the Entry's Status as it is and set the Note to what failed.
 
