@@ -2,7 +2,7 @@
 
 Your saved posts are a graveyard. Graveyard Killer turns them into a Library in your own Notion, Google Drive or Obsidian. Share a post from your phone, and your computer later watches it, reads what it says and files it. When something you saved is worth doing this week, such as a concert date or a recipe for the weekend, Claude messages you with an offer, and does nothing until you say yes. It needs no server and no API keys.
 
-**Status: early release (0.12.0).** Tested with Claude on Android and on a Mac. A tester ran the Worker end to end on Windows 11 ([#1](https://github.com/andreadorizza/graveyard-killer/issues/1)). iPhone and Linux should work the same way but are untested. The Library lives in Notion, in Google Drive (since 0.5.0) or, new in 0.12.0, in an Obsidian vault; saving to Drive or Obsidian from an iPhone is untested. New in 0.11.0, with no paid Claude plan, [Codex](#codex) runs the daily run in the ChatGPT desktop app, on any ChatGPT plan, and [OpenCode](#opencode) runs it on a free model; both are tested on a Mac only.
+**Status: early release (0.12.1).** Tested with Claude on Android and on a Mac. A tester ran the Worker end to end on Windows 11 ([#1](https://github.com/andreadorizza/graveyard-killer/issues/1)). iPhone and Linux should work the same way but are untested. The Library lives in Notion, in Google Drive (since 0.5.0) or, new in 0.12.0, in an Obsidian vault; saving to Drive or Obsidian from an iPhone is untested. New in 0.11.0, with no paid Claude plan, [Codex](#codex) runs the daily run in the ChatGPT desktop app, on any ChatGPT plan, and [OpenCode](#opencode) runs it on a free model; both are tested on a Mac only.
 
 ## Pick your setup
 
@@ -62,7 +62,8 @@ What is different from Claude:
 - **Your data and OpenAI.** On ChatGPT's personal plans, OpenAI may use your chats, Codex's included, to train its models unless you turn off *Improve the model for everyone* in *Settings → Data controls*. Setup asks you to turn it off, since your saved posts and Library go through those chats.
 - **A fenced run.** The scheduled task starts the run with one command, and the run itself happens in the run folder, under Codex's own settings for that folder: its commands can read only the skills and that folder and cannot reach the internet, and only Graveyard Killer's own scripts can download and transcribe. The app would otherwise run a task with your usual Codex permissions, which can read your whole disk.
 - **The run happens only while the ChatGPT app is running** and the computer is awake.
-- **Pings** come as a notification on your computer, or not at all. The whole message waits in the run's chat, under *Scheduled* in the app.
+- **Pings** come as a notification on your computer, or not at all. The whole message waits in the run's chat, under *Scheduled* in the app. Answer it there.
+- **Your phone.** Save through Notion's share menu, which needs no Claude or ChatGPT. This route installs Graveyard Killer's skills in Codex on your computer only, so a chat on your phone, in the Claude app or the ChatGPT app, does not have them: it cannot be counted on to file a post you share to it, find what you saved or answer a Ping by its number.
 - **Updates**: tell Codex "update Graveyard Killer".
 - Untested: Windows, Linux, and plans other than Free. The tests used the ChatGPT app 26.1111 on a Mac, on a Free account, with GPT-6 Luna.
 
