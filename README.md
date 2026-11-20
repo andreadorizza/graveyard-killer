@@ -17,7 +17,7 @@ Other Libraries, also with Claude:
 
 With no paid Claude plan, two routes do the daily run in another app, and both can cost nothing. Both need a Notion Library, ask more of you during setup, send Pings to your computer only, and were tested on a Mac only:
 
-- **[Codex](#codex) in the ChatGPT app**, with the ChatGPT account you may already have, on any plan: OpenAI lists Codex on Free and Go "in the desktop app, subject to rollout". Setup asks you to turn off the setting that lets OpenAI train on your chats, and a run happens only while the ChatGPT app is open.
+- **[Codex](#codex) in the ChatGPT app**, with the ChatGPT account you may already have, on any plan: OpenAI says Codex "is included across ChatGPT plans, including Free and Go", with usage limits that vary by plan. Setup asks you to turn off the setting that lets OpenAI train on your chats, and a run happens only while the ChatGPT app is open.
 - **[OpenCode](#opencode)**, if you are at ease installing a coding agent. It needs no account, but its free models have a usage limit that can block them for hours, and they are free only "for a limited time".
 
 ## What you need
@@ -42,7 +42,7 @@ Other agents can install the skills with `npx skills add andreadorizza/graveyard
 
 With a ChatGPT account, on any plan, Free included, the daily run happens in Codex, the coding agent in the ChatGPT desktop app. The app's own *Scheduled* view starts it every day, and there you see each run, change its time or run it now. It suits you if you already use ChatGPT and have no paid Claude plan. It needs:
 
-- The ChatGPT desktop app, from [chatgpt.com/download](https://chatgpt.com/download/) for a Mac or Windows (Linux has a preview), signed in. OpenAI lists Codex on Free and Go "in the desktop app, subject to rollout".
+- The ChatGPT desktop app, from [chatgpt.com/download](https://chatgpt.com/download/) for a Mac or Windows (Linux has a preview), signed in. [OpenAI's help center](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan) says Codex "is included across ChatGPT plans, including Free and Go", and its usage limits vary by plan (checked 2026-11-20).
 - A Notion Library. Google Drive and Obsidian are tested with Claude only.
 - Python 3 on your computer, as for Claude.
 
